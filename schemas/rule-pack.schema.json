@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/rule-pack.schema.json",
+  "title": "Document Standards Rule Pack",
+  "type": "object",
+  "required": ["schema_version", "id", "selector", "includes"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "1.0"},
+    "id": {"type": "string", "pattern": "^[A-Z0-9-]+$"},
+    "selector": {
+      "type": "object",
+      "required": ["regimes", "domains"],
+      "properties": {
+        "regimes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["administrative", "normative_legal", "party", "specialized", "unknown"]}},
+        "domains": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "includes": {
+      "type": "object",
+      "required": ["sources"],
+      "properties": {
+        "sources": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z0-9-]+$"}},
+        "rule_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "excludes": {
+      "type": "object",
+      "properties": {
+        "rule_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "overlay_policy": {
+      "type": "object",
+      "properties": {
+        "organization_profile": {"enum": ["allowed", "required", "forbidden"]}
+      },
+      "additionalProperties": false
+    },
+    "extensions": {"type": "object"}
+  },
+  "unevaluatedProperties": false
+}

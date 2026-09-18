@@ -1,0 +1,14 @@
+schema_version: "1.0"
+id: PARTY-DOCUMENT-FORMAT-2026
+selector:
+  regimes:
+    - party
+  domains:
+    - document_format
+    - document_structure
+includes:
+  sources:
+    - VN-PARTY-QD399-2026
+    - VN-PARTY-HD05-2026
+overlay_policy:
+  organization_profile: allowed

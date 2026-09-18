@@ -1,59 +1,117 @@
 # Chuẩn hoá Văn bản
 
-Repository tổng hợp các hướng dẫn, nguyên tắc và chuẩn mực để **chuẩn hoá việc soạn thảo, trình bày và quản lý văn bản** trong cơ quan, tổ chức.
+Repository tổng hợp các hướng dẫn, nguyên tắc, nguồn chuẩn và mô hình quy tắc để **chuẩn hoá việc soạn thảo, trình bày, quản lý và kiểm tra văn bản**.
 
-Hiện tại tập trung vào **Nghị định 30/2020/NĐ-CP** về công tác văn thư. Sau này sẽ bổ sung thêm các văn bản hướng dẫn khác (ví dụ Hướng dẫn 05 và các quy định liên quan).
+Hiện repository có hai lớp song song:
 
-## Mục tiêu
+1. **Legacy guides** trong `nghi-dinh-30/` — tài liệu hướng dẫn hiện có, đang chờ audit/migrate.
+2. **Kiến trúc v2** — Source Registry + Canonical Rules + Rule Packs + Profile + Document Model + Validation/Patch contracts.
 
-- Thống nhất thể thức, kỹ thuật trình bày và bố cục nội dung văn bản.
-- Cung cấp nguyên tắc, checklist và tài liệu tham khảo dễ áp dụng.
-- Xây dựng bộ tài liệu mở, có thể mở rộng theo các quy định mới.
+## Trạng thái
 
-## Cấu trúc dự án
+- Baseline v2: commit `6f5a5f1d38a18b6117d8054134e76e8df472d10a`.
+- GĐ0: xây foundation/schema/routing/safety; chưa triển khai production DOCX parser/formatter.
+- Các file trong `nghi-dinh-30/` chưa được coi là source of truth cho engine v2 cho đến khi audit/migrate hoàn tất.
 
+## Kiến trúc v2
+
+```text
+Official / verified sources
+        ↓
+Source Registry
+        ↓
+Atomic Canonical Rules
+        ↓
+Applicability + Temporal Resolver
+        ↓
+Minimal Rule Packs
+        │
+        ├──────────── Organization Profile
+        │
+DOCX → Document Engine
+        │
+        └─────────────┬──────────────
+                      ↓
+                  Validator
+                      ↓
+             Reversible safe patches
 ```
+
+Xem:
+
+- `ARCHITECTURE.md`
+- `SOURCE-MODEL.md`
+- `RULE-MODEL.md`
+- `DOCUMENT-MODEL.md`
+- `APPLICABILITY.md`
+- `FIX-SAFETY.md`
+- `VALIDATION-RESULTS.md`
+- `TECHNOLOGY-DECISIONS.md`
+- `MIGRATION-PLAN.md`
+
+## Cấu trúc chính
+
+```text
 ├── README.md
-├── nghi-dinh-30/                        # Theo Nghị định 30/2020/NĐ-CP
-│   ├── 01-nguyen-tac-chung.md
-│   ├── 02-the-thuc-van-ban.md
-│   ├── 03-ky-thuat-trinh-bay.md
-│   ├── 04-bo-cuc-noi-dung.md
-│   ├── 05-cac-loai-van-ban.md
-│   ├── 06-huong-dan-soan-thao.md
-│   └── 07-checklist-kiem-tra.md
-├── huong-dan-05/                        # (Sẽ bổ sung sau)
-└── quy-dinh-khac/                       # (Dành cho các quy định khác trong tương lai)
+├── ARCHITECTURE.md
+├── SOURCE-MODEL.md
+├── RULE-MODEL.md
+├── DOCUMENT-MODEL.md
+├── APPLICABILITY.md
+├── FIX-SAFETY.md
+├── VALIDATION-RESULTS.md
+├── TECHNOLOGY-DECISIONS.md
+├── MIGRATION-PLAN.md
+├── schemas/
+├── sources/
+├── rule-packs/
+├── profiles/
+├── tests/
+├── nghi-dinh-30/          # Legacy guides, audit/migration pending
+├── huong-dan-05/          # Legacy placeholder
+└── quy-dinh-khac/         # Legacy placeholder
 ```
 
-## Nội dung hiện có (Nghị định 30)
+## Regime và domain
+
+V2 không mặc định mọi tài liệu đều theo Nghị định 30. Runtime phải phân loại regime và domain trước khi chọn rule:
+
+- `administrative`
+- `normative_legal`
+- `party`
+- `specialized`
+- `unknown`
+
+Các domain gồm format, structure, workflow, electronic transaction/signature, records/archive, data governance, information security và legal authority.
+
+## Nguyên tắc bắt buộc
+
+- Markdown guide không phải source of truth.
+- Mandatory rule phải truy ngược được về nguồn.
+- Rule áp theo phạm vi + thời điểm hiệu lực.
+- Profile nội bộ không được override legal constraint.
+- `NOT_EVALUATED` không được báo thành `PASS`.
+- Tài liệu ký số mặc định chỉ audit, không auto-fix.
+- Auto-fix phải cục bộ, có audit trail và có thể kiểm tra before/after.
+
+## Nội dung hiện có theo Nghị định 30
 
 | File | Nội dung |
-|------|----------|
-| 01-nguyen-tac-chung.md | Nguyên tắc chung về công tác văn thư |
-| 02-the-thuc-van-ban.md | Thể thức văn bản hành chính + sơ đồ vị trí |
-| 03-ky-thuat-trinh-bay.md | Kỹ thuật trình bày (lề, phông chữ, cỡ chữ...) |
-| 04-bo-cuc-noi-dung.md | Bố cục nội dung linh hoạt |
-| 05-cac-loai-van-ban.md | 29 loại văn bản hành chính |
-| 06-huong-dan-soan-thao.md | Hướng dẫn soạn thảo từng bước |
-| 07-checklist-kiem-tra.md | Checklist kiểm tra trước khi ban hành |
+|---|---|
+| `01-nguyen-tac-chung.md` | Nguyên tắc chung |
+| `02-the-thuc-van-ban.md` | Thể thức văn bản |
+| `03-ky-thuat-trinh-bay.md` | Kỹ thuật trình bày |
+| `04-bo-cuc-noi-dung.md` | Bố cục nội dung |
+| `05-cac-loai-van-ban.md` | Các loại văn bản hành chính |
+| `06-huong-dan-soan-thao.md` | Hướng dẫn soạn thảo |
+| `07-checklist-kiem-tra.md` | Checklist hiện hành |
 
-## Kế hoạch mở rộng
-
-- [ ] Bổ sung nội dung theo **Hướng dẫn 05**
-- [ ] Thêm các quy định khác liên quan đến chuẩn hoá văn bản
-- [ ] Bổ sung thư mục `templates/` chứa mẫu Markdown / Word
-
-## Cách sử dụng
-
-1. Bắt đầu từ thư mục `nghi-dinh-30/` để nắm vững quy định hiện hành.
-2. Sử dụng checklist khi soạn thảo và trước khi ký ban hành.
-3. Theo dõi cập nhật khi có thêm nội dung mới.
+Các file này sẽ được audit và migrate ở GĐ1; checklist về lâu dài phải được sinh từ verified canonical rules.
 
 ## Đóng góp
 
-Mọi góp ý, bổ sung nội dung hoặc chỉnh sửa vui lòng tạo Issue hoặc Pull Request.
+Thay đổi kiến trúc/schema/rules nên thực hiện qua feature branch + Pull Request, không sửa trực tiếp `main`.
 
 ---
 
-**Lưu ý**: Tài liệu mang tính tổng hợp và hướng dẫn thực hành, không thay thế văn bản pháp luật gốc. Khi có sự khác biệt, ưu tiên áp dụng văn bản pháp luật hiện hành.
+**Lưu ý:** Repository hỗ trợ chuẩn hoá và kiểm tra; không thay thế văn bản pháp luật, quy định của Đảng hoặc quyết định nghiệp vụ của người có thẩm quyền.

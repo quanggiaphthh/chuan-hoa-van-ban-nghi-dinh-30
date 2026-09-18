@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/source.schema.json",
+  "title": "Document Standards Source Manifest",
+  "type": "object",
+  "required": ["schema_version", "id", "identity", "source_role", "legal_status", "scope", "verification"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "1.0"},
+    "id": {"type": "string", "pattern": "^[A-Z0-9-]+$"},
+    "identity": {
+      "type": "object",
+      "required": ["number", "title", "issuer", "instrument_type", "issued_date"],
+      "properties": {
+        "number": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "issuer": {"type": "string", "minLength": 1},
+        "instrument_type": {"type": "string", "minLength": 1},
+        "issued_date": {"type": "string", "format": "date"}
+      },
+      "additionalProperties": false
+    },
+    "source_role": {
+      "enum": [
+        "normative_original",
+        "normative_amendment",
+        "official_consolidated_text",
+        "implementing_instrument",
+        "official_application_guidance",
+        "official_example",
+        "party_normative",
+        "party_guidance",
+        "organizational_policy",
+        "commentary"
+      ]
+    },
+    "legal_status": {
+      "type": "object",
+      "required": ["effective_from", "overall_status", "verified_at"],
+      "properties": {
+        "effective_from": {"type": "string", "format": "date"},
+        "effective_to": {"type": ["string", "null"], "format": "date"},
+        "overall_status": {"enum": ["active", "partially_amended", "expired", "repealed", "unknown"]},
+        "verified_at": {"type": "string", "format": "date"}
+      },
+      "additionalProperties": false
+    },
+    "scope": {
+      "type": "object",
+      "required": ["regimes", "domains", "scope_level"],
+      "properties": {
+        "regimes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["administrative", "normative_legal", "party", "specialized", "unknown"]}},
+        "domains": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "scope_level": {"enum": ["nationwide_state", "party_system_wide", "sector", "organization", "internal_unit"]}
+      },
+      "additionalProperties": false
+    },
+    "official_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["provider", "url"],
+        "properties": {
+          "provider": {"type": "string"},
+          "url": {"type": "string", "format": "uri"},
+          "verified": {"type": "boolean", "default": false}
+        },
+        "additionalProperties": false
+      }
+    },
+    "relations": {
+      "type": "object",
+      "properties": {
+        "amends": {"$ref": "#/$defs/relations"},
+        "amended_by": {"$ref": "#/$defs/relations"},
+        "replaces": {"$ref": "#/$defs/relations"},
+        "replaced_by": {"$ref": "#/$defs/relations"},
+        "repeals": {"$ref": "#/$defs/relations"},
+        "repealed_by": {"$ref": "#/$defs/relations"},
+        "details": {"$ref": "#/$defs/relations"},
+        "detailed_by": {"$ref": "#/$defs/relations"},
+        "guides_application_of": {"$ref": "#/$defs/relations"},
+        "consolidated_from": {"$ref": "#/$defs/relations"}
+      },
+      "additionalProperties": false
+    },
+    "implementation": {
+      "type": "object",
+      "properties": {
+        "status": {"enum": ["core", "registered", "deferred", "implemented"]},
+        "rules_mapped": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "required": ["metadata_checked", "legal_status_checked", "source_content_cross_checked"],
+      "properties": {
+        "metadata_checked": {"type": "boolean"},
+        "legal_status_checked": {"type": "boolean"},
+        "source_content_cross_checked": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "extensions": {"type": "object"}
+  },
+  "$defs": {
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_id"],
+        "properties": {
+          "source_id": {"type": "string", "pattern": "^[A-Z0-9-]+$"},
+          "effective_from": {"type": "string", "format": "date"},
+          "note": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "unevaluatedProperties": false
+}

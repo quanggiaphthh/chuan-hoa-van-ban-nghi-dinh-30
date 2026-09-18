@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/patch.schema.json",
+  "title": "Document Patch",
+  "type": "object",
+  "required": ["patch_id", "rule_id", "target_id", "operation", "property", "before", "after", "safety", "status"],
+  "properties": {
+    "patch_id": {"type": "string"},
+    "rule_id": {"type": "string"},
+    "target_id": {"type": "string"},
+    "operation": {"enum": ["set_property", "insert_component", "remove_component", "move_component", "replace_text"]},
+    "property": {"type": ["string", "null"]},
+    "before": {},
+    "after": {},
+    "safety": {
+      "type": "object",
+      "required": ["policy", "preconditions", "postconditions"],
+      "properties": {
+        "policy": {"enum": ["SAFE", "GUARDED", "SUGGEST_ONLY", "PROHIBITED"]},
+        "preconditions": {"type": "array", "items": {"type": "string"}},
+        "postconditions": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "status": {"enum": ["PLANNED", "APPLIED", "SKIPPED", "REJECTED", "ROLLED_BACK"]},
+    "extensions": {"type": "object"}
+  },
+  "unevaluatedProperties": false
+}

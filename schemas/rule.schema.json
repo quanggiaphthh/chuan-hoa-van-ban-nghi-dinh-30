@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/rule.schema.json",
+  "title": "Document Standards Canonical Rule",
+  "type": "object",
+  "required": ["schema_version", "id", "regime", "domain", "source", "normativity", "temporality", "target", "constraint", "validation", "autofix"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "1.0"},
+    "id": {"type": "string", "minLength": 3},
+    "regime": {"enum": ["administrative", "normative_legal", "party", "specialized", "unknown"]},
+    "domain": {"enum": ["document_format", "document_structure", "document_workflow", "electronic_transaction", "electronic_signature", "file_interoperability", "records_management", "archival_preservation", "data_governance", "information_security", "legal_authority"]},
+    "source": {
+      "type": "object",
+      "required": ["source_id", "locator"],
+      "properties": {
+        "source_id": {"type": "string", "pattern": "^[A-Z0-9-]+$"},
+        "locator": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "integer"]}}
+      },
+      "additionalProperties": false
+    },
+    "normativity": {"enum": ["mandatory", "guidance", "organizational", "recommendation"]},
+    "maturity": {"enum": ["draft", "extracted", "reviewed", "verified"]},
+    "temporality": {
+      "type": "object",
+      "required": ["effective_from"],
+      "properties": {
+        "effective_from": {"type": "string", "format": "date"},
+        "effective_to": {"type": ["string", "null"], "format": "date"}
+      },
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "required": ["object_type", "property"],
+      "properties": {
+        "object_type": {"type": "string"},
+        "property": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "applicability": {
+      "type": "object",
+      "properties": {
+        "all": {"type": "array", "items": {"$ref": "#/$defs/condition"}},
+        "any": {"type": "array", "items": {"$ref": "#/$defs/condition"}},
+        "section_roles": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "constraint": {
+      "oneOf": [
+        {"$ref": "#/$defs/equalsConstraint"},
+        {"$ref": "#/$defs/rangeConstraint"},
+        {"$ref": "#/$defs/simpleConstraint"}
+      ]
+    },
+    "validation": {
+      "type": "object",
+      "required": ["severity"],
+      "properties": {
+        "severity": {"enum": ["LEGAL_ERROR", "LEGAL_WARNING", "PROFILE_MISMATCH", "QUALITY_WARNING", "INFORMATION"]}
+      },
+      "additionalProperties": false
+    },
+    "autofix": {
+      "type": "object",
+      "required": ["policy"],
+      "properties": {
+        "policy": {"enum": ["SAFE", "GUARDED", "SUGGEST_ONLY", "PROHIBITED"]}
+      },
+      "additionalProperties": false
+    },
+    "requires_capability": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "extensions": {"type": "object"}
+  },
+  "$defs": {
+    "condition": {
+      "type": "object",
+      "required": ["field", "operator"],
+      "properties": {
+        "field": {"type": "string"},
+        "operator": {"enum": ["equals", "not_equals", "in", "not_in", "exists", "not_exists"]},
+        "value": {}
+      },
+      "additionalProperties": false
+    },
+    "equalsConstraint": {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": {
+        "type": {"const": "equals"},
+        "value": {}
+      },
+      "additionalProperties": false
+    },
+    "rangeConstraint": {
+      "type": "object",
+      "required": ["type", "min", "max"],
+      "properties": {
+        "type": {"const": "numeric_range"},
+        "min": {"type": "number"},
+        "max": {"type": "number"},
+        "unit": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "simpleConstraint": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"enum": ["one_of", "regex", "required", "forbidden", "ordered", "conditional", "reference", "semantic_review"]},
+        "value": {},
+        "values": {"type": "array"},
+        "pattern": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "unevaluatedProperties": false
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/profile.schema.json",
+  "title": "Organization Document Profile",
+  "type": "object",
+  "required": ["schema_version", "id", "selections"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "1.0"},
+    "id": {"type": "string", "pattern": "^[A-Z0-9-]+$"},
+    "extends": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z0-9-]+$"}},
+    "organization": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "organization_type": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "selections": {
+      "type": "object",
+      "description": "Giá trị nội bộ được chọn trong biên pháp lý.",
+      "additionalProperties": true
+    },
+    "additional_policies": {
+      "type": "object",
+      "description": "Quy định nội bộ bổ sung, không được override mandatory legal rule.",
+      "additionalProperties": true
+    },
+    "extensions": {"type": "object"}
+  },
+  "unevaluatedProperties": false
+}

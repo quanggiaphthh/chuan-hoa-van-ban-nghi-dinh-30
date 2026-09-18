@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/validation-result.schema.json",
+  "title": "Validation Result",
+  "type": "object",
+  "required": ["rule_id", "status", "severity", "message"],
+  "properties": {
+    "rule_id": {"type": "string"},
+    "status": {"enum": ["PASS", "FAIL", "NOT_APPLICABLE", "NOT_EVALUATED", "NEEDS_REVIEW"]},
+    "severity": {"enum": ["LEGAL_ERROR", "LEGAL_WARNING", "PROFILE_MISMATCH", "QUALITY_WARNING", "INFORMATION"]},
+    "target": {"type": ["string", "null"]},
+    "expected": {},
+    "actual": {},
+    "source": {"type": ["object", "null"]},
+    "message": {"type": "string"},
+    "evidence": {"type": ["object", "null"]},
+    "autofix": {
+      "type": "object",
+      "properties": {
+        "policy": {"enum": ["SAFE", "GUARDED", "SUGGEST_ONLY", "PROHIBITED"]},
+        "eligible": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "extensions": {"type": "object"}
+  },
+  "unevaluatedProperties": false
+}

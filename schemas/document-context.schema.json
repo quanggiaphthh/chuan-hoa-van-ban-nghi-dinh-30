@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/document-context.schema.json",
+  "title": "Document Context",
+  "type": "object",
+  "required": ["issue_date", "issuer", "document", "regime", "medium", "lifecycle", "security"],
+  "properties": {
+    "issue_date": {"type": "string", "format": "date"},
+    "issuer": {
+      "type": "object",
+      "required": ["issuing_body"],
+      "properties": {
+        "legal_person_type": {"type": ["string", "null"]},
+        "issuing_body": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {"type": "string"},
+            "name": {"type": ["string", "null"]}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "document": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"type": "string"},
+        "legal_character": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "regime": {
+      "type": "object",
+      "required": ["value", "status"],
+      "properties": {
+        "value": {"enum": ["administrative", "normative_legal", "party", "specialized", "unknown"]},
+        "status": {"enum": ["CONFIRMED", "INFERRED_HIGH", "INFERRED_LOW", "UNKNOWN"]}
+      },
+      "additionalProperties": false
+    },
+    "medium": {"enum": ["paper", "electronic", "hybrid", "unknown"]},
+    "lifecycle": {
+      "type": "object",
+      "required": ["stage"],
+      "properties": {
+        "stage": {"enum": ["draft", "approved", "issued", "active_record", "closed_file", "agency_archive", "historical_archive", "preservation", "disposal", "unknown"]}
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "required": ["classification"],
+      "properties": {
+        "classification": {"enum": ["public", "internal", "personal_data", "state_secret", "unknown"]}
+      },
+      "additionalProperties": false
+    },
+    "extensions": {"type": "object"}
+  },
+  "unevaluatedProperties": false
+}

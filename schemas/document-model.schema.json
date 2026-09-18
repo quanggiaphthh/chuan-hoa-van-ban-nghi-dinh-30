@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/document-model.schema.json",
+  "title": "Canonical Document Model",
+  "type": "object",
+  "required": ["format", "sections", "semantic_components"],
+  "properties": {
+    "format": {"enum": ["docx", "odt", "html", "pdf_derived", "unknown"]},
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "effective_properties"],
+        "properties": {
+          "id": {"type": "string"},
+          "role": {"type": ["string", "null"]},
+          "effective_properties": {"type": "object"},
+          "source_evidence": {"$ref": "#/$defs/evidence"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "semantic_components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "role", "text", "effective_properties", "classification"],
+        "properties": {
+          "id": {"type": "string"},
+          "role": {"type": "string"},
+          "text": {"type": "string"},
+          "effective_properties": {"type": "object"},
+          "classification": {
+            "type": "object",
+            "required": ["method", "status"],
+            "properties": {
+              "method": {"enum": ["deterministic", "heuristic", "llm", "human"]},
+              "status": {"enum": ["CONFIRMED", "INFERRED_HIGH", "INFERRED_LOW", "UNKNOWN"]}
+            },
+            "additionalProperties": false
+          },
+          "source_evidence": {"$ref": "#/$defs/evidence"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "headers": {"type": "array", "items": {"type": "object"}},
+    "footers": {"type": "array", "items": {"type": "object"}},
+    "tables": {"type": "array", "items": {"type": "object"}},
+    "capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "preflight": {
+      "type": "object",
+      "properties": {
+        "digitally_signed": {"type": "boolean"},
+        "protected": {"type": "boolean"},
+        "tracked_changes": {"type": "boolean"},
+        "macro_enabled": {"type": "boolean"},
+        "unsupported_features": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "extensions": {"type": "object"}
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "format": {"type": "string"},
+        "part": {"type": "string"},
+        "paragraph_ref": {"type": "string"},
+        "run_refs": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    }
+  },
+  "unevaluatedProperties": false
+}
