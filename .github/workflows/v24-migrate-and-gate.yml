@@ -51,12 +51,15 @@ jobs:
           print('native v24 workflow patched for PyYAML')
           PY
 
-      - name: Verify expected upstream V24 payload files
+      - name: Verify raw upstream V24 payload
         shell: bash
         run: |
           test -f upstream-v24/v24-runtime/materialize_v24_compact.py
-          test -f upstream-v24/v22-runtime/scripts/v24/audit_v24_static.py
           test -f upstream-v24/.github/workflows/v24-validator-gate.yml
+          test -f upstream-v24/v24-runtime/.v24-payload/code/part-00
+          test -f upstream-v24/v24-runtime/.v24-payload/code/part-01
+          test -f upstream-v24/v24-runtime/.v24-payload/rules/part-00
+          test -f upstream-v24/v24-runtime/.v24-payload/rules/part-03
           grep -q 'PyYAML==6.0.3' upstream-v24/.github/workflows/v24-validator-gate.yml
 
       - name: Publish migrated V24 branch to fork
