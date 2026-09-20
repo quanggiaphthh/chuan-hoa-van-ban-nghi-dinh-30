@@ -51,7 +51,7 @@ jobs:
           print('native v24 workflow patched for PyYAML')
           PY
 
-      - name: Verify raw upstream V24 payload
+      - name: Verify and snapshot raw upstream V24 payload
         shell: bash
         run: |
           test -f upstream-v24/v24-runtime/materialize_v24_compact.py
@@ -61,15 +61,21 @@ jobs:
           test -f upstream-v24/v24-runtime/.v24-payload/rules/part-00
           test -f upstream-v24/v24-runtime/.v24-payload/rules/part-03
           grep -q 'PyYAML==6.0.3' upstream-v24/.github/workflows/v24-validator-gate.yml
+          tar --exclude='.git' -C upstream-v24 -cf "$RUNNER_TEMP/v24-upstream.tar" .
+          test -s "$RUNNER_TEMP/v24-upstream.tar"
 
       - name: Publish migrated V24 branch to fork
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch "$TARGET_BRANCH"
-          rsync -a --delete --exclude '.git' upstream-v24/ ./
           rm -rf upstream-v24
+          git switch "$TARGET_BRANCH"
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          tar -xf "$RUNNER_TEMP/v24-upstream.tar" -C .
+          test -f .github/workflows/v24-validator-gate.yml
+          test -f v24-runtime/materialize_v24_compact.py
+          grep -q 'PyYAML==6.0.3' .github/workflows/v24-validator-gate.yml
           git add -A
           git commit -m 'GĐ4 v24: migrate runtime source and fix PyYAML CI dependency'
           git push origin "$TARGET_BRANCH"
