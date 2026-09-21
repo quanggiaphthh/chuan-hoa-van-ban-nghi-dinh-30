@@ -1,8 +1,5 @@
 name: V26 Production Safe Autofix Gate
-on:
-  workflow_dispatch:
-  push:
-    branches: [feature/gd4-v26-production-safe-autofix]
+on: {workflow_dispatch: {}, push: {branches: [feature/gd4-v26-production-safe-autofix]}}
 permissions: {contents: read}
 jobs:
   v26:
@@ -20,14 +17,9 @@ jobs:
         run: |
           git merge-base --is-ancestor 29be75547a7558ca3773763a00d9da150b9bfa44 HEAD
           cd v22-runtime && python scripts/v23/bootstrap_v23_payload.py && python scripts/v23/apply_v23_runtime_corrections.py && cd ..
-          python v24-runtime/materialize_v24_compact.py
-          python v24-runtime/assert_v24_canonicalization.py
-          python v25-runtime/materialize_v25_l2.py
-          python v25-runtime/materialize_v25_l3.py
-          python v25-runtime/materialize_v25_l4a.py
-          python v25-runtime/materialize_v25_l4b.py
-          python v25-runtime/correct_v25_l4c_test_default.py
-          python v25-runtime/materialize_v25_l4c.py
+          python v24-runtime/materialize_v24_compact.py && python v24-runtime/assert_v24_canonicalization.py
+          python v25-runtime/materialize_v25_l2.py && python v25-runtime/materialize_v25_l3.py && python v25-runtime/materialize_v25_l4a.py && python v25-runtime/materialize_v25_l4b.py
+          python v25-runtime/correct_v25_l4c_test_default.py && python v25-runtime/materialize_v25_l4c.py
           cd v22-runtime && python scripts/v22/generate_docx_fixtures.py && python scripts/v22/normalize_generated_fixtures.py && python scripts/v23/generate_semantic_fixtures.py
       - name: Locked baseline 124
         working-directory: v22-runtime
@@ -40,38 +32,31 @@ jobs:
       - name: Foundation RED
         id: red_foundation
         continue-on-error: true
-        run: |
-          python v26-runtime/materialize_v26_foundation.py --tests-only
-          cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26ProductionSafeAutofixTests
+        run: python v26-runtime/materialize_v26_foundation.py --tests-only && cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26ProductionSafeAutofixTests
       - name: Foundation GREEN
         id: foundation
         run: |
           test "${{ steps.red_foundation.outcome }}" = failure
-          python v26-runtime/materialize_v26_foundation.py --production-only
-          python v26-runtime/correct_v26_foundation.py
+          python v26-runtime/materialize_v26_foundation.py --production-only && python v26-runtime/correct_v26_foundation.py
           cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26ProductionSafeAutofixTests
       - name: Atomic RED
         id: red_atomic
         continue-on-error: true
-        run: |
-          python v26-runtime/materialize_v26_atomic.py --tests-only
-          cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26AtomicExecutionTests
+        run: python v26-runtime/materialize_v26_atomic.py --tests-only && cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26AtomicExecutionTests
       - name: Atomic GREEN baseline
         run: |
           test "${{ steps.red_atomic.outcome }}" = failure
-          python v26-runtime/materialize_v26_atomic.py --production-only
-          python v26-runtime/correct_v26_atomic.py
+          python v26-runtime/materialize_v26_atomic.py --production-only && python v26-runtime/correct_v26_atomic.py
       - name: Final authority and canonical revalidation RED
         id: red_final
         continue-on-error: true
-        run: |
-          python v26-runtime/materialize_v26_final_red.py
-          cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26FinalGapRedTests
+        run: python v26-runtime/materialize_v26_final_red.py && cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26FinalGapRedTests
       - name: Close final V26 gaps
         id: final_green
         run: |
           test "${{ steps.red_final.outcome }}" = failure
           python v26-runtime/close_v26_final_gaps.py
+          python v26-runtime/correct_v26_final_namespace.py
           rm -f v22-runtime/tests/LegalValidator.Tests/V26ProductionSafeAutofixTests.cs v22-runtime/tests/LegalValidator.Tests/V26AtomicExecutionTests.cs
           cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter 'FullyQualifiedName~V26FinalGapRedTests|FullyQualifiedName~V26FinalAuthorityRevalidationTests'
       - name: Release build
@@ -89,16 +74,11 @@ jobs:
           dotnet test DocumentEngine.slnx --no-build -c Release --logger 'trx;LogFileName=v26-tests.trx' --logger 'console;verbosity=minimal' | tee /tmp/full
           ! grep -E 'Failed:[[:space:]]+[1-9]' /tmp/full
           ! grep -E 'Skipped:[[:space:]]+[1-9]' /tmp/full
-          grep -E 'Passed!.*LegalValidator.Tests' /tmp/full || true
-          grep -E 'Passed!.*DocumentEngine.Tests' /tmp/full || true
-          grep -E 'Passed!.*SemanticDetector.Tests' /tmp/full || true
       - name: Static safety
         id: static
         working-directory: v22-runtime
         run: |
-          python scripts/v22/audit_v22_static.py
-          python scripts/v23/audit_v23_static.py
-          python scripts/v24/audit_v24_static.py
+          python scripts/v22/audit_v22_static.py && python scripts/v23/audit_v23_static.py && python scripts/v24/audit_v24_static.py
           ! grep -R -E 'SaveAs|\.Save\(|OpenWrite|FileMode.Create|File\.Replace|WordprocessingDocument.Open.*true' src/LegalValidator/State src/LegalValidator/Remediation src/LegalValidator/Authorization
           grep -q 'internal sealed record PlanOperation' src/LegalValidator/Execution/V26ExecutionSafety.cs
           ! grep -q 'MutationPlan Create(string' src/LegalValidator/Execution/V26ExecutionSafety.cs
@@ -112,39 +92,22 @@ jobs:
       - name: Source immutability preservation journal durability
         id: safety
         working-directory: v22-runtime
-        run: |
-          dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter 'FullyQualifiedName~V25L4CMutationTests|FullyQualifiedName~V26FinalGapRedTests|FullyQualifiedName~V26FinalAuthorityRevalidationTests'
+        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter 'FullyQualifiedName~V25L4CMutationTests|FullyQualifiedName~V26FinalGapRedTests|FullyQualifiedName~V26FinalAuthorityRevalidationTests'
       - name: Package tested source
         id: package
         working-directory: v22-runtime
         run: |
-          rm -rf src/*/bin src/*/obj tests/*/bin tests/*/obj
-          find . -type d -name TestResults -prune -exec rm -rf {} +
+          rm -rf src/*/bin src/*/obj tests/*/bin tests/*/obj && find . -type d -name TestResults -prune -exec rm -rf {} +
           zip -qr ../v26-production-safe-autofix-tested-source.zip . -x '.v23-payload/*'
           sha256sum ../v26-production-safe-autofix-tested-source.zip > ../v26-production-safe-autofix-tested-source.zip.sha256
           sha256sum -c ../v26-production-safe-autofix-tested-source.zip.sha256
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
-        with:
-          name: v26-production-safe-autofix-results
-          path: |
-            v22-runtime/**/TestResults/**
-            v26-production-safe-autofix-tested-source.zip
-            v26-production-safe-autofix-tested-source.zip.sha256
-          if-no-files-found: warn
+        with: {name: v26-production-safe-autofix-results, path: "v22-runtime/**/TestResults/**\nv26-production-safe-autofix-tested-source.zip\nv26-production-safe-autofix-tested-source.zip.sha256", if-no-files-found: warn}
       - name: Enforce gate
         if: always()
         run: |
           echo "red_foundation=${{ steps.red_foundation.outcome }} foundation=${{ steps.foundation.outcome }} red_atomic=${{ steps.red_atomic.outcome }} red_final=${{ steps.red_final.outcome }} final_green=${{ steps.final_green.outcome }} build=${{ steps.build.outcome }} targeted=${{ steps.targeted.outcome }} regression=${{ steps.regression.outcome }} static=${{ steps.static.outcome }} safety=${{ steps.safety.outcome }} package=${{ steps.package.outcome }}"
-          test "${{ steps.red_foundation.outcome }}" = failure
-          test "${{ steps.foundation.outcome }}" = success
-          test "${{ steps.red_atomic.outcome }}" = failure
-          test "${{ steps.red_final.outcome }}" = failure
-          test "${{ steps.final_green.outcome }}" = success
-          test "${{ steps.build.outcome }}" = success
-          test "${{ steps.targeted.outcome }}" = success
-          test "${{ steps.regression.outcome }}" = success
-          test "${{ steps.static.outcome }}" = success
-          test "${{ steps.safety.outcome }}" = success
-          test "${{ steps.package.outcome }}" = success
+          test "${{ steps.red_foundation.outcome }}" = failure && test "${{ steps.foundation.outcome }}" = success && test "${{ steps.red_atomic.outcome }}" = failure && test "${{ steps.red_final.outcome }}" = failure
+          test "${{ steps.final_green.outcome }}" = success && test "${{ steps.build.outcome }}" = success && test "${{ steps.targeted.outcome }}" = success && test "${{ steps.regression.outcome }}" = success && test "${{ steps.static.outcome }}" = success && test "${{ steps.safety.outcome }}" = success && test "${{ steps.package.outcome }}" = success
