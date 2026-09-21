@@ -63,12 +63,9 @@ jobs:
           expected = named_contract or missing_qa_namespace
           infra = re.search(r'NU1301|Unable to load the service index|SDK.*not found|No such file or directory', text, re.I) is not None
           print(f'structural_red_outcome={outcome} expected_missing_contract={expected} infrastructure_failure={infra} log_bytes={len(text.encode("utf-8"))}')
-          if outcome != 'failure':
-              sys.exit('Structural RED was not a genuine failed test/build step')
-          if not expected:
-              sys.exit('Structural RED log does not identify the intentionally missing V27 QA contract')
-          if infra:
-              sys.exit('Structural RED is contaminated by infrastructure failure')
+          if outcome != 'failure': sys.exit('Structural RED was not a genuine failed test/build step')
+          if not expected: sys.exit('Structural RED log does not identify the intentionally missing V27 QA contract')
+          if infra: sys.exit('Structural RED is contaminated by infrastructure failure')
           PY
       - name: Structural GREEN
         id: structural_green
@@ -101,3 +98,29 @@ jobs:
           echo "baseline=${{ steps.baseline.outcome }} red=${{ steps.structural_red.outcome }} proof=${{ steps.red_proof.outcome }} green=${{ steps.structural_green.outcome }} build=${{ steps.build.outcome }} regression=${{ steps.regression.outcome }} static=${{ steps.static.outcome }}"
           test "${{ steps.baseline.outcome }}" = success && test "${{ steps.structural_red.outcome }}" = failure && test "${{ steps.red_proof.outcome }}" = success
           test "${{ steps.structural_green.outcome }}" = success && test "${{ steps.build.outcome }}" = success && test "${{ steps.regression.outcome }}" = success && test "${{ steps.static.outcome }}" = success
+      - name: Probe renderer runtime
+        id: renderer_probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          renderer="$(command -v soffice || command -v libreoffice || true)"
+          if [ -z "$renderer" ]; then
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo 'V27_RENDERER_AVAILABLE=false'
+            echo 'No preinstalled soffice/libreoffice renderer found on runner.'
+            exit 0
+          fi
+          version="$($renderer --version 2>&1 | head -n 1)"
+          printf 'available=true\n' >> "$GITHUB_OUTPUT"
+          printf 'path=%s\n' "$renderer" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'V27_RENDERER_AVAILABLE=true\nV27_RENDERER_PATH=%s\nV27_RENDERER_VERSION=%s\n' "$renderer" "$version"
+      - name: Renderer capability verdict
+        run: |
+          echo "renderer_available=${{ steps.renderer_probe.outputs.available }}"
+          if [ "${{ steps.renderer_probe.outputs.available }}" != true ]; then
+            echo 'V27 BLOCKED — RENDERER FOUNDATION REQUIRED'
+          else
+            echo "V27 renderer foundation present: ${{ steps.renderer_probe.outputs.path }} | ${{ steps.renderer_probe.outputs.version }}"
+            echo 'NEXT: Visual RED -> Visual GREEN -> real-DOCX render/E2E'
+          fi
