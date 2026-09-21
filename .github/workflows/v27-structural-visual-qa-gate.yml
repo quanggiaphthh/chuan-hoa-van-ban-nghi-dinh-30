@@ -33,17 +33,14 @@ jobs:
           dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release | tee /tmp/l
           dotnet test tests/DocumentEngine.Tests/DocumentEngine.Tests.csproj -c Release | tee /tmp/d
           dotnet test tests/SemanticDetector.Tests/SemanticDetector.Tests.csproj -c Release | tee /tmp/s
-          grep -Eq 'Passed:[[:space:]]+99' /tmp/l
-          grep -Eq 'Passed:[[:space:]]+31' /tmp/d
-          grep -Eq 'Passed:[[:space:]]+13' /tmp/s
+          grep -Eq 'Passed:[[:space:]]+99' /tmp/l && grep -Eq 'Passed:[[:space:]]+31' /tmp/d && grep -Eq 'Passed:[[:space:]]+13' /tmp/s
           ! grep -E 'Failed:[[:space:]]+[1-9]|Skipped:[[:space:]]+[1-9]' /tmp/l /tmp/d /tmp/s
       - name: Structural RED
         id: structural_red
         continue-on-error: true
         run: |
           python v27-runtime/materialize_v27_structural.py --tests-only
-          cd v22-runtime
-          dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V27StructuralQaTests 2>&1 | tee /tmp/v27-red.log
+          cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V27StructuralQaTests 2>&1 | tee /tmp/v27-red.log
       - name: Prove structural RED genuine
         id: red_proof
         run: |
@@ -54,8 +51,7 @@ jobs:
         id: structural_green
         run: |
           python v27-runtime/materialize_v27_structural.py --production-only
-          cd v22-runtime
-          dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V27StructuralQaTests --logger 'console;verbosity=detailed'
+          cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V27StructuralQaTests --logger 'console;verbosity=detailed'
       - name: Release build
         id: build
         working-directory: v22-runtime
@@ -67,24 +63,18 @@ jobs:
           dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release | tee /tmp/l2
           dotnet test tests/DocumentEngine.Tests/DocumentEngine.Tests.csproj --no-build -c Release | tee /tmp/d2
           dotnet test tests/SemanticDetector.Tests/SemanticDetector.Tests.csproj --no-build -c Release | tee /tmp/s2
-          grep -Eq 'Passed:[[:space:]]+106' /tmp/l2
-          grep -Eq 'Passed:[[:space:]]+31' /tmp/d2
-          grep -Eq 'Passed:[[:space:]]+13' /tmp/s2
+          grep -Eq 'Passed:[[:space:]]+106' /tmp/l2 && grep -Eq 'Passed:[[:space:]]+31' /tmp/d2 && grep -Eq 'Passed:[[:space:]]+13' /tmp/s2
           ! grep -E 'Failed:[[:space:]]+[1-9]|Skipped:[[:space:]]+[1-9]' /tmp/l2 /tmp/d2 /tmp/s2
       - name: Structural authority static gate
         id: static
         run: |
-          grep -q 'Compare(string source,string output,StructuralAuthorityPlan plan)' v22-runtime/src/LegalValidator/Qa/V27StructuralQa.cs
-          ! grep -R -Ei 'ignore(list|differences)?|whitelist|SaveAs|OpenWrite|WordprocessingDocument.Open\([^,]+,[[:space:]]*true' v22-runtime/src/LegalValidator/Qa
+          grep -q 'Compare(string source,string output,MutationPlan plan)' v22-runtime/src/LegalValidator/Qa/V27StructuralQa.cs
+          ! grep -R -Ei 'StructuralAuthorityPlan|ignore(list|differences)?|whitelist|SaveAs|OpenWrite|WordprocessingDocument.Open\([^,]+,[[:space:]]*true' v22-runtime/src/LegalValidator/Qa
+          grep -q 'GetProperty("Operations")' v22-runtime/src/LegalValidator/Qa/V27StructuralQa.cs
           git diff --exit-code f55d82be4657f9da6bee594325d2cccb26c995ff -- v26-runtime v22-runtime/src/LegalValidator/Execution v22-runtime/src/LegalValidator/Authorization v22-runtime/src/LegalValidator/Mutation v22-runtime/src/LegalValidator/Remediation
       - name: Structural enforce before renderer probe
         if: always()
         run: |
           echo "baseline=${{ steps.baseline.outcome }} red=${{ steps.structural_red.outcome }} proof=${{ steps.red_proof.outcome }} green=${{ steps.structural_green.outcome }} build=${{ steps.build.outcome }} regression=${{ steps.regression.outcome }} static=${{ steps.static.outcome }}"
-          test "${{ steps.baseline.outcome }}" = success
-          test "${{ steps.structural_red.outcome }}" = failure
-          test "${{ steps.red_proof.outcome }}" = success
-          test "${{ steps.structural_green.outcome }}" = success
-          test "${{ steps.build.outcome }}" = success
-          test "${{ steps.regression.outcome }}" = success
-          test "${{ steps.static.outcome }}" = success
+          test "${{ steps.baseline.outcome }}" = success && test "${{ steps.structural_red.outcome }}" = failure && test "${{ steps.red_proof.outcome }}" = success
+          test "${{ steps.structural_green.outcome }}" = success && test "${{ steps.build.outcome }}" = success && test "${{ steps.regression.outcome }}" = success && test "${{ steps.static.outcome }}" = success
