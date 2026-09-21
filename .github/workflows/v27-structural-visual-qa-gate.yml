@@ -92,35 +92,56 @@ jobs:
           ! grep -R -Ei 'StructuralAuthorityPlan|ignore(list|differences)?|whitelist|SaveAs|OpenWrite|WordprocessingDocument.Open\([^,]+,[[:space:]]*true' v22-runtime/src/LegalValidator/Qa
           grep -q 'GetProperty("Operations")' v22-runtime/src/LegalValidator/Qa/V27StructuralQa.cs
           git diff --exit-code f55d82be4657f9da6bee594325d2cccb26c995ff -- v26-runtime v22-runtime/src/LegalValidator/Execution v22-runtime/src/LegalValidator/Authorization v22-runtime/src/LegalValidator/Mutation v22-runtime/src/LegalValidator/Remediation
-      - name: Structural enforce before renderer probe
+      - name: Structural enforce before renderer foundation
         if: always()
         run: |
           echo "baseline=${{ steps.baseline.outcome }} red=${{ steps.structural_red.outcome }} proof=${{ steps.red_proof.outcome }} green=${{ steps.structural_green.outcome }} build=${{ steps.build.outcome }} regression=${{ steps.regression.outcome }} static=${{ steps.static.outcome }}"
           test "${{ steps.baseline.outcome }}" = success && test "${{ steps.structural_red.outcome }}" = failure && test "${{ steps.red_proof.outcome }}" = success
           test "${{ steps.structural_green.outcome }}" = success && test "${{ steps.build.outcome }}" = success && test "${{ steps.regression.outcome }}" = success && test "${{ steps.static.outcome }}" = success
-      - name: Probe renderer runtime
-        id: renderer_probe
+      - name: Probe preinstalled renderer
+        id: renderer_preprobe
         shell: bash
         run: |
           set -euo pipefail
           renderer="$(command -v soffice || command -v libreoffice || true)"
           if [ -z "$renderer" ]; then
             echo 'available=false' >> "$GITHUB_OUTPUT"
-            echo 'V27_RENDERER_AVAILABLE=false'
-            echo 'No preinstalled soffice/libreoffice renderer found on runner.'
-            exit 0
-          fi
-          version="$($renderer --version 2>&1 | head -n 1)"
-          printf 'available=true\n' >> "$GITHUB_OUTPUT"
-          printf 'path=%s\n' "$renderer" >> "$GITHUB_OUTPUT"
-          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
-          printf 'V27_RENDERER_AVAILABLE=true\nV27_RENDERER_PATH=%s\nV27_RENDERER_VERSION=%s\n' "$renderer" "$version"
-      - name: Renderer capability verdict
-        run: |
-          echo "renderer_available=${{ steps.renderer_probe.outputs.available }}"
-          if [ "${{ steps.renderer_probe.outputs.available }}" != true ]; then
-            echo 'V27 BLOCKED — RENDERER FOUNDATION REQUIRED'
+            echo 'V27_PREINSTALLED_RENDERER=false'
           else
-            echo "V27 renderer foundation present: ${{ steps.renderer_probe.outputs.path }} | ${{ steps.renderer_probe.outputs.version }}"
-            echo 'NEXT: Visual RED -> Visual GREEN -> real-DOCX render/E2E'
+            version="$($renderer --version 2>&1 | head -n 1)"
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+            printf 'path=%s\nversion=%s\n' "$renderer" "$version" >> "$GITHUB_OUTPUT"
+            printf 'V27_PREINSTALLED_RENDERER=true\nV27_RENDERER_PATH=%s\nV27_RENDERER_VERSION=%s\n' "$renderer" "$version"
           fi
+      - name: Provision LibreOffice renderer foundation
+        if: steps.renderer_preprobe.outputs.available != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          candidate="$(apt-cache policy libreoffice-writer | awk '/Candidate:/ {print $2}')"
+          test -n "$candidate" && test "$candidate" != '(none)'
+          echo "V27_LIBREOFFICE_CANDIDATE=$candidate"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "libreoffice-writer=$candidate"
+      - name: Verify renderer foundation
+        id: renderer_probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          renderer="$(command -v soffice || command -v libreoffice || true)"
+          test -n "$renderer"
+          version="$($renderer --version 2>&1 | head -n 1)"
+          package_version="$(dpkg-query -W -f='${Version}' libreoffice-writer 2>/dev/null || true)"
+          printf 'available=true\npath=%s\nversion=%s\npackage_version=%s\n' "$renderer" "$version" "$package_version" >> "$GITHUB_OUTPUT"
+          printf 'V27_RENDERER_AVAILABLE=true\nV27_RENDERER_PATH=%s\nV27_RENDERER_VERSION=%s\nV27_LIBREOFFICE_PACKAGE_VERSION=%s\n' "$renderer" "$version" "$package_version"
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          "$renderer" --headless --convert-to pdf --outdir "$tmp" v22-runtime/fixtures/v23/02-named-decision.docx 2>&1 | tee /tmp/v27-renderer-smoke.log
+          test -s "$tmp/02-named-decision.pdf"
+          sha256sum "$tmp/02-named-decision.pdf"
+          echo 'V27_RENDERER_SMOKE=PASS'
+      - name: Renderer foundation verdict
+        run: |
+          test "${{ steps.renderer_probe.outputs.available }}" = true
+          echo "V27 renderer foundation READY: ${{ steps.renderer_probe.outputs.path }} | ${{ steps.renderer_probe.outputs.version }} | package=${{ steps.renderer_probe.outputs.package_version }}"
+          echo 'NEXT: Visual RED -> Visual GREEN -> real-DOCX render/E2E'
