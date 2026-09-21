@@ -1,0 +1,167 @@
+name: V23 Semantic Detector Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/gd3-v23-semantic-detector
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  v23-semantic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Show toolchain
+        working-directory: v22-runtime
+        run: |
+          dotnet --info
+          dotnet --list-sdks
+          python --version
+
+      - name: Bootstrap V23 source payload
+        working-directory: v22-runtime
+        run: python scripts/v23/bootstrap_v23_payload.py
+
+      - name: Apply targeted V23 runtime corrections
+        working-directory: v22-runtime
+        run: python scripts/v23/apply_v23_runtime_corrections.py
+
+      - name: Generate deterministic fixtures
+        working-directory: v22-runtime
+        run: |
+          python scripts/v22/generate_docx_fixtures.py
+          python scripts/v22/normalize_generated_fixtures.py
+          python scripts/v23/generate_semantic_fixtures.py
+
+      - name: Static V22 and V23 audits
+        working-directory: v22-runtime
+        run: |
+          python scripts/v22/audit_v22_static.py
+          python scripts/v23/audit_v23_static.py
+
+      - name: Restore
+        id: restore
+        continue-on-error: true
+        working-directory: v22-runtime
+        run: |
+          set -o pipefail
+          dotnet restore DocumentEngine.slnx 2>&1 | tee restore-v23.log
+
+      - name: Build
+        id: build
+        if: steps.restore.outcome == 'success'
+        continue-on-error: true
+        working-directory: v22-runtime
+        run: |
+          set -o pipefail
+          dotnet build DocumentEngine.slnx --no-restore -c Release 2>&1 | tee build-v23.log
+
+      - name: Test
+        id: test
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        working-directory: v22-runtime
+        run: |
+          set -o pipefail
+          dotnet test DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=v23-tests.trx" --logger "console;verbosity=detailed" 2>&1 | tee test-v23.log
+
+      - name: Final static regression
+        if: steps.test.outcome == 'success'
+        working-directory: v22-runtime
+        run: |
+          python scripts/v22/audit_v22_static.py
+          python scripts/v23/audit_v23_static.py
+
+      - name: Package tested V23 runtime source
+        if: steps.test.outcome == 'success'
+        working-directory: v22-runtime
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          import hashlib
+          root = Path('.').resolve()
+          out = root / 'v23-runtime-tested-source.zip'
+          excluded_parts = {'.git', 'bin', 'obj', 'TestResults', '.v23-payload'}
+          excluded_names = {'restore-v23.log', 'build-v23.log', 'test-v23.log', out.name}
+          files = []
+          for p in root.rglob('*'):
+              if not p.is_file():
+                  continue
+              rel = p.relative_to(root)
+              if any(part in excluded_parts for part in rel.parts):
+                  continue
+              if p.name in excluded_names:
+                  continue
+              files.append(p)
+          files.sort(key=lambda p: p.relative_to(root).as_posix())
+          with ZipFile(out, 'w', ZIP_DEFLATED) as z:
+              for p in files:
+                  z.write(p, p.relative_to(root).as_posix())
+          digest = hashlib.sha256(out.read_bytes()).hexdigest()
+          (root / 'v23-runtime-tested-source.zip.sha256').write_text(f'{digest}  {out.name}\n', encoding='utf-8')
+          print(f'packaged_files={len(files)} sha256={digest}')
+          PY
+
+      - name: Publish diagnostics issue
+        if: steps.restore.outcome != 'success' || steps.build.outcome == 'failure' || steps.test.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const base = path.join(process.env.GITHUB_WORKSPACE, 'v22-runtime');
+            const parts = [];
+            for (const f of ['restore-v23.log','build-v23.log','test-v23.log']) {
+              const p = path.join(base, f);
+              if (fs.existsSync(p)) {
+                let t = fs.readFileSync(p, 'utf8');
+                if (t.length > 50000) t = t.slice(-50000);
+                parts.push(`## ${f}\n\n\`\`\`text\n${t}\n\`\`\``);
+              }
+            }
+            const body = `Commit: ${context.sha}\nRun: ${context.runId}\n\n` + parts.join('\n\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `V23 Semantic Gate diagnostics ${context.sha.substring(0,7)}`,
+              body
+            });
+
+      - name: Upload V23 test results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v23-semantic-results
+          path: |
+            v22-runtime/**/TestResults/**
+            v22-runtime/*-v23.log
+            v22-runtime/v23-runtime-tested-source.zip
+            v22-runtime/v23-runtime-tested-source.zip.sha256
+          if-no-files-found: warn
+
+      - name: Enforce gate
+        if: always()
+        run: |
+          echo "restore=${{ steps.restore.outcome }} build=${{ steps.build.outcome }} test=${{ steps.test.outcome }}"
+          test "${{ steps.restore.outcome }}" = "success"
+          test "${{ steps.build.outcome }}" = "success"
+          test "${{ steps.test.outcome }}" = "success"
