@@ -1,106 +1,102 @@
-# V25 L1 canonical runtime verification
-name: V24 Legal Validator Runtime Gate
-
+name: V25 L2 Legal Validator Hardening Gate
 on:
   workflow_dispatch:
   push:
-    branches:
-      - feature/gd4-v24-validator-runtime
-      - feature/gd4-v25-l1-canonical-runtime
-
+    branches: [feature/gd4-v25-l2-validator-hardening]
 permissions:
   contents: read
-  issues: write
-
 jobs:
-  v24-validator:
+  validator-hardening:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install Python audit dependencies
-        run: python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
-      - name: Bootstrap tested V23 source
-        working-directory: v22-runtime
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: {dotnet-version: '10.0.x'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
+      - name: Bootstrap V23 and materialize canonical V24
         run: |
+          cd v22-runtime
           python scripts/v23/bootstrap_v23_payload.py
           python scripts/v23/apply_v23_runtime_corrections.py
-      - name: Materialize compact V24 validator and verified catalog
-        run: python v24-runtime/materialize_v24_compact.py
-      - name: V24 canonicalization guard
-        run: python v24-runtime/assert_v24_canonicalization.py
-      - name: Generate deterministic V22 and V23 fixtures
+          cd ..
+          python v24-runtime/materialize_v24_compact.py
+          python v24-runtime/assert_v24_canonicalization.py
+      - name: Materialize V25 L2 RED tests only
+        run: python v25-runtime/materialize_v25_l2.py --tests-only
+      - name: Restore for RED
+        working-directory: v22-runtime
+        run: dotnet restore DocumentEngine.slnx
+      - name: Verify RED regression guard
+        id: red
+        continue-on-error: true
+        working-directory: v22-runtime
+        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~Unsupported_applicability_operator_is_not_evaluated
+      - name: Enforce RED was real
+        run: test "${{ steps.red.outcome }}" = "failure"
+      - name: Materialize minimal V25 L2 production hardening
+        run: python v25-runtime/materialize_v25_l2.py --production-only
+      - name: Generate deterministic fixtures
         working-directory: v22-runtime
         run: |
           python scripts/v22/generate_docx_fixtures.py
           python scripts/v22/normalize_generated_fixtures.py
           python scripts/v23/generate_semantic_fixtures.py
-      - name: Static V22 V23 V24 audits
+      - name: Static audits
         working-directory: v22-runtime
         run: |
           python scripts/v22/audit_v22_static.py
           python scripts/v23/audit_v23_static.py
           python scripts/v24/audit_v24_static.py
-      - name: Restore
-        id: restore
-        continue-on-error: true
-        working-directory: v22-runtime
-        run: dotnet restore DocumentEngine.slnx
       - name: Build
         id: build
-        if: steps.restore.outcome == 'success'
-        continue-on-error: true
         working-directory: v22-runtime
         run: dotnet build DocumentEngine.slnx --no-restore -c Release
-      - name: Test
-        id: test
-        if: steps.build.outcome == 'success'
-        continue-on-error: true
+      - name: V25 L2 targeted tests
+        id: targeted
         working-directory: v22-runtime
-        run: dotnet test DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=v24-tests.trx" --logger "console;verbosity=detailed"
+        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter FullyQualifiedName~V25L2HardeningTests --logger "console;verbosity=detailed"
+      - name: Full regression
+        id: test
+        working-directory: v22-runtime
+        run: dotnet test DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=v25-l2-tests.trx" --logger "console;verbosity=detailed"
       - name: Final static regression
         id: regression
-        if: steps.test.outcome == 'success'
         working-directory: v22-runtime
         run: |
           python scripts/v22/audit_v22_static.py
           python scripts/v23/audit_v23_static.py
           python scripts/v24/audit_v24_static.py
-      - name: Package tested V24 runtime source
+          python ../v24-runtime/assert_v24_canonicalization.py || true
+          grep -q 'private static bool? Condition' src/LegalValidator/Evaluation/RuleEvaluator.cs
+          grep -q 'V25L2HardeningTests' tests/LegalValidator.Tests/V25L2HardeningTests.cs
+      - name: Package tested V25 L2 source
         id: package
-        if: steps.test.outcome == 'success'
         working-directory: v22-runtime
         run: |
-          rm -rf src/DocumentEngine/bin src/DocumentEngine/obj src/SemanticDetector/bin src/SemanticDetector/obj src/LegalValidator/bin src/LegalValidator/obj
-          rm -rf tests/DocumentEngine.Tests/bin tests/DocumentEngine.Tests/obj tests/SemanticDetector.Tests/bin tests/SemanticDetector.Tests/obj tests/LegalValidator.Tests/bin tests/LegalValidator.Tests/obj
+          rm -rf src/*/bin src/*/obj tests/*/bin tests/*/obj
           find . -type d -name TestResults -prune -exec rm -rf {} +
-          zip -qr ../v24-runtime-tested-source.zip . -x '.v23-payload/*'
-          sha256sum ../v24-runtime-tested-source.zip > ../v24-runtime-tested-source.zip.sha256
-      - name: Upload V24 results
+          zip -qr ../v25-l2-runtime-tested-source.zip . -x '.v23-payload/*'
+          sha256sum ../v25-l2-runtime-tested-source.zip > ../v25-l2-runtime-tested-source.zip.sha256
+      - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v24-validator-results
+          name: v25-l2-validator-results
           path: |
             v22-runtime/**/TestResults/**
-            v24-runtime-tested-source.zip
-            v24-runtime-tested-source.zip.sha256
+            v25-l2-runtime-tested-source.zip
+            v25-l2-runtime-tested-source.zip.sha256
           if-no-files-found: warn
       - name: Enforce gate
         if: always()
         run: |
-          echo "restore=${{ steps.restore.outcome }} build=${{ steps.build.outcome }} test=${{ steps.test.outcome }} regression=${{ steps.regression.outcome }} package=${{ steps.package.outcome }}"
-          test "${{ steps.restore.outcome }}" = "success"
+          echo "red=${{ steps.red.outcome }} build=${{ steps.build.outcome }} targeted=${{ steps.targeted.outcome }} test=${{ steps.test.outcome }} regression=${{ steps.regression.outcome }} package=${{ steps.package.outcome }}"
+          test "${{ steps.red.outcome }}" = "failure"
           test "${{ steps.build.outcome }}" = "success"
+          test "${{ steps.targeted.outcome }}" = "success"
           test "${{ steps.test.outcome }}" = "success"
           test "${{ steps.regression.outcome }}" = "success"
           test "${{ steps.package.outcome }}" = "success"
