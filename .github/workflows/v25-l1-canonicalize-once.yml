@@ -1,0 +1,35 @@
+name: V25 L1 Canonicalize Once
+on:
+  push:
+    branches:
+      - feature/gd4-v25-l1-canonical-runtime
+permissions:
+  contents: write
+jobs:
+  canonicalize:
+    if: github.event.head_commit.message == 'chore(v25): bootstrap canonical payload migration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reproduce canonical defects before migration
+        run: |
+          python v24-runtime/materialize_v24_compact.py
+          test "$(grep -c 'using Xunit;' v22-runtime/tests/LegalValidator.Tests/LegalValidatorTests.cs || true)" = "0"
+          test "$(grep -c '01-named-decision.docx' v22-runtime/tests/LegalValidator.Tests/LegalValidatorTests.cs)" = "2"
+          echo 'RED reproduction PASS: canonical materialization contains both known defects'
+      - name: Canonicalize payload and remove transitional patch
+        run: python v25-runtime/canonicalize_v24_payload_once.py
+      - name: Verify clean materialization and guard
+        run: |
+          rm -rf v22-runtime/src/LegalValidator v22-runtime/tests/LegalValidator.Tests v22-runtime/scripts/v24
+          python v24-runtime/materialize_v24_compact.py
+          python v24-runtime/assert_v24_canonicalization.py
+      - name: Commit canonical source
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'fix(v25): canonicalize V24 runtime payload'
+          git push origin HEAD:feature/gd4-v25-l1-canonical-runtime
