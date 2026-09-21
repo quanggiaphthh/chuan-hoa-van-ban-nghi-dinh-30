@@ -1,0 +1,1 @@
+Payload chunks are staged on a temporary branch before the runtime gate is triggered.
