@@ -41,6 +41,7 @@ jobs:
         continue-on-error: true
         run: |
           python v27-runtime/materialize_v27_structural.py --tests-only
+          set -o pipefail
           cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V27StructuralQaTests 2>&1 | tee /tmp/v27-red.log
       - name: Prove structural RED genuine
         id: red_proof
