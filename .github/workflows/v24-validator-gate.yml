@@ -1,12 +1,12 @@
-name: V25 L2 Legal Validator Hardening Gate
+name: V25 L3 Patch Safety Gate
 on:
   workflow_dispatch:
   push:
-    branches: [feature/gd4-v25-l2-validator-hardening]
+    branches: [feature/gd4-v25-l3-patch-safety]
 permissions:
   contents: read
 jobs:
-  validator-hardening:
+  patch-safety:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
-      - name: Bootstrap V23 and materialize canonical V24
+      - name: Bootstrap and materialize locked runtime
         run: |
           cd v22-runtime
           python scripts/v23/bootstrap_v23_payload.py
@@ -24,20 +24,21 @@ jobs:
           cd ..
           python v24-runtime/materialize_v24_compact.py
           python v24-runtime/assert_v24_canonicalization.py
-      - name: Materialize V25 L2 RED tests only
-        run: python v25-runtime/materialize_v25_l2.py --tests-only
+          python v25-runtime/materialize_v25_l2.py
+      - name: Materialize V25 L3 RED tests only
+        run: python v25-runtime/materialize_v25_l3.py --tests-only
       - name: Restore for RED
         working-directory: v22-runtime
         run: dotnet restore DocumentEngine.slnx
-      - name: Verify RED regression guard
+      - name: Verify RED is real
         id: red
         continue-on-error: true
         working-directory: v22-runtime
-        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~Unsupported_applicability_operator_is_not_evaluated
-      - name: Enforce RED was real
+        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V25L3PatchSafetyTests
+      - name: Enforce RED
         run: test "${{ steps.red.outcome }}" = "failure"
-      - name: Materialize minimal V25 L2 production hardening
-        run: python v25-runtime/materialize_v25_l2.py --production-only
+      - name: Materialize minimal L3 production layer
+        run: python v25-runtime/materialize_v25_l3.py --production-only
       - name: Generate deterministic fixtures
         working-directory: v22-runtime
         run: |
@@ -50,18 +51,19 @@ jobs:
           python scripts/v22/audit_v22_static.py
           python scripts/v23/audit_v23_static.py
           python scripts/v24/audit_v24_static.py
+          python ../v24-runtime/assert_v24_canonicalization.py
       - name: Build
         id: build
         working-directory: v22-runtime
         run: dotnet build DocumentEngine.slnx --no-restore -c Release
-      - name: V25 L2 targeted tests
+      - name: V25 L3 targeted tests
         id: targeted
         working-directory: v22-runtime
-        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter FullyQualifiedName~V25L2HardeningTests --logger "console;verbosity=detailed"
+        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter FullyQualifiedName~V25L3PatchSafetyTests --logger "console;verbosity=detailed"
       - name: Full regression
         id: test
         working-directory: v22-runtime
-        run: dotnet test DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=v25-l2-tests.trx" --logger "console;verbosity=detailed"
+        run: dotnet test DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=v25-l3-tests.trx" --logger "console;verbosity=detailed"
       - name: Final static regression
         id: regression
         working-directory: v22-runtime
@@ -69,26 +71,27 @@ jobs:
           python scripts/v22/audit_v22_static.py
           python scripts/v23/audit_v23_static.py
           python scripts/v24/audit_v24_static.py
-          python ../v24-runtime/assert_v24_canonicalization.py || true
-          grep -q 'private static bool? Condition' src/LegalValidator/Evaluation/RuleEvaluator.cs
           grep -q 'V25L2HardeningTests' tests/LegalValidator.Tests/V25L2HardeningTests.cs
-      - name: Package tested V25 L2 source
+          grep -q 'V25L3PatchSafetyTests' tests/LegalValidator.Tests/V25L3PatchSafetyTests.cs
+          grep -q 'class RemediationPlanner' src/LegalValidator/Remediation/RemediationPlanner.cs
+          ! grep -R -E 'WriteAll|OpenWrite|FileMode.Create|WordprocessingDocument.Open.*true' src/LegalValidator/Remediation
+      - name: Package tested V25 L3 source
         id: package
         working-directory: v22-runtime
         run: |
           rm -rf src/*/bin src/*/obj tests/*/bin tests/*/obj
           find . -type d -name TestResults -prune -exec rm -rf {} +
-          zip -qr ../v25-l2-runtime-tested-source.zip . -x '.v23-payload/*'
-          sha256sum ../v25-l2-runtime-tested-source.zip > ../v25-l2-runtime-tested-source.zip.sha256
+          zip -qr ../v25-l3-runtime-tested-source.zip . -x '.v23-payload/*'
+          sha256sum ../v25-l3-runtime-tested-source.zip > ../v25-l3-runtime-tested-source.zip.sha256
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v25-l2-validator-results
+          name: v25-l3-patch-safety-results
           path: |
             v22-runtime/**/TestResults/**
-            v25-l2-runtime-tested-source.zip
-            v25-l2-runtime-tested-source.zip.sha256
+            v25-l3-runtime-tested-source.zip
+            v25-l3-runtime-tested-source.zip.sha256
           if-no-files-found: warn
       - name: Enforce gate
         if: always()
