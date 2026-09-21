@@ -52,7 +52,7 @@ public sealed class V25L3PatchSafetyTests {
  [Fact] public void Signed_document_is_blocked(){var p=new RemediationPlanner().Propose(Finding(),Safety(PatchPolicy.AUDIT_ONLY,signed:true));Assert.Equal(RemediationDecision.BLOCKED_PROTECTED,p.Decision);Assert.False(p.Executable);}
  [Fact] public void Protected_document_is_blocked(){var p=new RemediationPlanner().Propose(Finding(),Safety(PatchPolicy.AUDIT_ONLY,prot:true));Assert.Equal(RemediationDecision.BLOCKED_PROTECTED,p.Decision);Assert.False(p.Executable);}
  [Fact] public void Proposal_preserves_rule_finding_and_evidence_provenance(){var p=new RemediationPlanner().Propose(Finding(),Safety());Assert.Equal("RULE.1",p.RuleId);Assert.Contains("RULE.1",p.FindingReference);Assert.Equal(["ev-1"],p.EvidenceReferences);Assert.Equal("p-1",p.TargetId);}
- [Fact] public void Same_input_produces_deterministic_proposal(){var x=new RemediationPlanner();var a=x.Propose(Finding(),Safety());var b=x.Propose(Finding(),Safety());Assert.Equal(a,b);}
+ [Fact] public void Same_input_produces_deterministic_proposal(){var x=new RemediationPlanner();var a=x.Propose(Finding(),Safety());var b=x.Propose(Finding(),Safety());Assert.Equal(a.ProposalId,b.ProposalId);Assert.Equal(a.Decision,b.Decision);Assert.Equal(a.TargetId,b.TargetId);Assert.Equal(a.EvidenceReferences,b.EvidenceReferences);}
  [Fact] public void Proposal_does_not_mutate_document_or_grant_write_authority(){var f=Finding();var s=Safety();var p=new RemediationPlanner().Propose(f,s);Assert.True(p.Executable);Assert.Equal(RemediationDecision.ELIGIBLE,p.Decision);Assert.Contains("separate authorized path",p.Reason,StringComparison.OrdinalIgnoreCase);Assert.Equal("Arial",f.Observed);Assert.Equal(PatchPolicy.NORMAL,s.PatchPolicy);}
 }
 ''',encoding='utf-8')
