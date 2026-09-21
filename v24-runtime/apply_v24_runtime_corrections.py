@@ -16,3 +16,10 @@ if 'using Xunit;' not in text:
     print('v24 runtime correction applied: added missing using Xunit;')
 else:
     print('v24 runtime correction already present: using Xunit;')
+
+print('--- LegalValidatorTests.cs diagnostic ---')
+for number, line in enumerate(TEST_FILE.read_text(encoding='utf-8').splitlines(), 1):
+    if number > 80:
+        break
+    print(f'{number:03}: {line}')
+print('--- end diagnostic ---')
