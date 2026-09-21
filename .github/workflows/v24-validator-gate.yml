@@ -48,6 +48,9 @@ jobs:
       - name: Materialize compact V24 validator and verified catalog
         run: python v24-runtime/materialize_v24_compact.py
 
+      - name: Apply V24 runtime corrections
+        run: python v24-runtime/apply_v24_runtime_corrections.py
+
       - name: Generate deterministic V22 and V23 fixtures
         working-directory: v22-runtime
         run: |
