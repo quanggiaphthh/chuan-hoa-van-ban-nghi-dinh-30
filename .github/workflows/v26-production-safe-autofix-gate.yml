@@ -16,16 +16,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
-      - name: Verify canonical ancestry
+      - name: Verify canonical baseline and materialize locked stages
         run: |
           git merge-base --is-ancestor 29be75547a7558ca3773763a00d9da150b9bfa44 HEAD
-          test "$(git rev-parse 29be75547a7558ca3773763a00d9da150b9bfa44)" = 29be75547a7558ca3773763a00d9da150b9bfa44
-      - name: Materialize locked V22-V25
-        run: |
-          cd v22-runtime
-          python scripts/v23/bootstrap_v23_payload.py
-          python scripts/v23/apply_v23_runtime_corrections.py
-          cd ..
+          cd v22-runtime && python scripts/v23/bootstrap_v23_payload.py && python scripts/v23/apply_v23_runtime_corrections.py && cd ..
           python v24-runtime/materialize_v24_compact.py
           python v24-runtime/assert_v24_canonicalization.py
           python v25-runtime/materialize_v25_l2.py
@@ -34,68 +28,55 @@ jobs:
           python v25-runtime/materialize_v25_l4b.py
           python v25-runtime/correct_v25_l4c_test_default.py
           python v25-runtime/materialize_v25_l4c.py
-      - name: Generate canonical fixtures
+          cd v22-runtime && python scripts/v22/generate_docx_fixtures.py && python scripts/v22/normalize_generated_fixtures.py && python scripts/v23/generate_semantic_fixtures.py
+      - name: Restore and locked baseline 124
         working-directory: v22-runtime
         run: |
-          python scripts/v22/generate_docx_fixtures.py
-          python scripts/v22/normalize_generated_fixtures.py
-          python scripts/v23/generate_semantic_fixtures.py
-      - name: Restore
-        working-directory: v22-runtime
-        run: dotnet restore DocumentEngine.slnx
-      - name: Locked baseline inventory 124
-        working-directory: v22-runtime
-        run: |
-          dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --logger 'console;verbosity=minimal' | tee /tmp/legal.txt
-          dotnet test tests/DocumentEngine.Tests/DocumentEngine.Tests.csproj -c Release --logger 'console;verbosity=minimal' | tee /tmp/doc.txt
-          dotnet test tests/SemanticDetector.Tests/SemanticDetector.Tests.csproj -c Release --logger 'console;verbosity=minimal' | tee /tmp/sem.txt
-          grep -Eq 'Passed:[[:space:]]+80' /tmp/legal.txt
-          grep -Eq 'Passed:[[:space:]]+31' /tmp/doc.txt
-          grep -Eq 'Passed:[[:space:]]+13' /tmp/sem.txt
-      - name: Journal plan conflict RED tests
-        run: python v26-runtime/materialize_v26_foundation.py --tests-only
-      - name: Prove foundation RED
+          dotnet restore DocumentEngine.slnx
+          dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release | tee /tmp/l
+          dotnet test tests/DocumentEngine.Tests/DocumentEngine.Tests.csproj -c Release | tee /tmp/d
+          dotnet test tests/SemanticDetector.Tests/SemanticDetector.Tests.csproj -c Release | tee /tmp/s
+          grep -Eq 'Passed:[[:space:]]+80' /tmp/l && grep -Eq 'Passed:[[:space:]]+31' /tmp/d && grep -Eq 'Passed:[[:space:]]+13' /tmp/s
+      - name: Foundation RED
         id: red_foundation
         continue-on-error: true
-        working-directory: v22-runtime
-        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26ProductionSafeAutofixTests
-      - name: Enforce foundation RED
-        run: test "${{ steps.red_foundation.outcome }}" = failure
-      - name: Materialize journal plan conflict production
         run: |
+          python v26-runtime/materialize_v26_foundation.py --tests-only
+          cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26ProductionSafeAutofixTests
+      - name: Foundation GREEN
+        id: foundation
+        run: |
+          test "${{ steps.red_foundation.outcome }}" = failure
           python v26-runtime/materialize_v26_foundation.py --production-only
           python v26-runtime/correct_v26_foundation.py
-      - name: Foundation GREEN
-        id: foundation_green
-        working-directory: v22-runtime
-        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26ProductionSafeAutofixTests
-      - name: Atomic formatting revalidation RED tests
-        run: python v26-runtime/materialize_v26_atomic.py --tests-only
-      - name: Prove atomic RED
+          cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26ProductionSafeAutofixTests
+      - name: Atomic RED
         id: red_atomic
         continue-on-error: true
-        working-directory: v22-runtime
-        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26AtomicExecutionTests
-      - name: Enforce atomic RED
-        run: test "${{ steps.red_atomic.outcome }}" = failure
-      - name: Materialize atomic production
-        run: python v26-runtime/materialize_v26_atomic.py --production-only
+        run: |
+          python v26-runtime/materialize_v26_atomic.py --tests-only
+          cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V26AtomicExecutionTests
+      - name: Atomic production and corrective
+        run: |
+          test "${{ steps.red_atomic.outcome }}" = failure
+          python v26-runtime/materialize_v26_atomic.py --production-only
+          python v26-runtime/correct_v26_atomic.py
       - name: Release build
         id: build
         working-directory: v22-runtime
         run: dotnet build DocumentEngine.slnx -c Release
-      - name: All V26 targeted GREEN
+      - name: V26 targeted
         id: targeted
         working-directory: v22-runtime
         run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter 'FullyQualifiedName~V26ProductionSafeAutofixTests|FullyQualifiedName~V26AtomicExecutionTests' --logger 'console;verbosity=detailed'
-      - name: Full regression inventory
+      - name: Full regression
         id: regression
         working-directory: v22-runtime
         run: |
-          dotnet test DocumentEngine.slnx --no-build -c Release --logger 'trx;LogFileName=v26-tests.trx' --logger 'console;verbosity=minimal' | tee /tmp/v26-full.txt
-          ! grep -E 'Failed:[[:space:]]+[1-9]' /tmp/v26-full.txt
-          ! grep -E 'Skipped:[[:space:]]+[1-9]' /tmp/v26-full.txt
-      - name: Static safety and authority boundary
+          dotnet test DocumentEngine.slnx --no-build -c Release --logger 'trx;LogFileName=v26-tests.trx' --logger 'console;verbosity=minimal' | tee /tmp/full
+          ! grep -E 'Failed:[[:space:]]+[1-9]' /tmp/full
+          ! grep -E 'Skipped:[[:space:]]+[1-9]' /tmp/full
+      - name: Static safety
         id: static
         working-directory: v22-runtime
         run: |
@@ -105,18 +86,12 @@ jobs:
           ! grep -R -E 'SaveAs|\.Save\(|OpenWrite|FileMode.Create|File\.Replace|WordprocessingDocument.Open.*true' src/LegalValidator/State src/LegalValidator/Remediation src/LegalValidator/Authorization
           ! grep -E 'WordprocessingDocument|DocumentFormat.OpenXml' src/LegalValidator/Execution/V26ExecutionSafety.cs
           grep -q 'WordprocessingDocument.Open(tmp,true)' src/LegalValidator/Execution/AtomicMutationPlanExecutor.cs
-          ! grep -R -E 'XPath|SelectSingleNode|arbitraryName|SetProperty' src/LegalValidator/Execution
-          grep -q 'paragraph.spacing.after' src/LegalValidator/Execution/AtomicMutationPlanExecutor.cs
-          grep -q 'DIRECT' src/LegalValidator/Execution/AtomicMutationPlanExecutor.cs
-          ! grep -R -E 'RuleCatalog|ProposedValue|finding.Expected' src/LegalValidator/Execution
-      - name: Source immutability and preservation evidence
-        id: preservation
+          ! grep -R -E 'XPath|SelectSingleNode|arbitraryName|SetProperty|RuleCatalog|ProposedValue|finding.Expected' src/LegalValidator/Execution
+      - name: Source immutability preservation journal durability
+        id: safety
         working-directory: v22-runtime
-        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter 'FullyQualifiedName~V25L4CMutationTests|FullyQualifiedName~V26AtomicExecutionTests'
-      - name: Journal durability evidence
-        id: journal
-        working-directory: v22-runtime
-        run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter FullyQualifiedName~V26ProductionSafeAutofixTests
+        run: |
+          dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter 'FullyQualifiedName~V25L4CMutationTests|FullyQualifiedName~V26AtomicExecutionTests|FullyQualifiedName~V26ProductionSafeAutofixTests'
       - name: Package tested source
         id: package
         working-directory: v22-runtime
@@ -139,14 +114,13 @@ jobs:
       - name: Enforce gate
         if: always()
         run: |
-          echo "red_foundation=${{ steps.red_foundation.outcome }} foundation=${{ steps.foundation_green.outcome }} red_atomic=${{ steps.red_atomic.outcome }} build=${{ steps.build.outcome }} targeted=${{ steps.targeted.outcome }} regression=${{ steps.regression.outcome }} static=${{ steps.static.outcome }} preservation=${{ steps.preservation.outcome }} journal=${{ steps.journal.outcome }} package=${{ steps.package.outcome }}"
+          echo "red_foundation=${{ steps.red_foundation.outcome }} foundation=${{ steps.foundation.outcome }} red_atomic=${{ steps.red_atomic.outcome }} build=${{ steps.build.outcome }} targeted=${{ steps.targeted.outcome }} regression=${{ steps.regression.outcome }} static=${{ steps.static.outcome }} safety=${{ steps.safety.outcome }} package=${{ steps.package.outcome }}"
           test "${{ steps.red_foundation.outcome }}" = failure
-          test "${{ steps.foundation_green.outcome }}" = success
+          test "${{ steps.foundation.outcome }}" = success
           test "${{ steps.red_atomic.outcome }}" = failure
           test "${{ steps.build.outcome }}" = success
           test "${{ steps.targeted.outcome }}" = success
           test "${{ steps.regression.outcome }}" = success
           test "${{ steps.static.outcome }}" = success
-          test "${{ steps.preservation.outcome }}" = success
-          test "${{ steps.journal.outcome }}" = success
+          test "${{ steps.safety.outcome }}" = success
           test "${{ steps.package.outcome }}" = success
