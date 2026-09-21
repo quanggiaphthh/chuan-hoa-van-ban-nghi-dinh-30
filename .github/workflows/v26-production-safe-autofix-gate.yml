@@ -29,6 +29,14 @@ jobs:
           python v25-runtime/correct_v25_l4c_test_default.py
           python v25-runtime/materialize_v25_l4c.py
           cd v22-runtime && python scripts/v22/generate_docx_fixtures.py && python scripts/v22/normalize_generated_fixtures.py && python scripts/v23/generate_semantic_fixtures.py
+      - name: Trace canonical revalidation APIs
+        run: |
+          echo '=== RuleCatalog ==='
+          grep -R -n -A80 -B5 'class RuleCatalog' v22-runtime/src/LegalValidator || true
+          echo '=== LegalValidatorTests composition ==='
+          grep -n -A80 -B20 'RuleCatalog\|RuleEvaluator\|AdministrativeSemanticDetector\|DocxParser' v22-runtime/tests/LegalValidator.Tests/LegalValidatorTests.cs || true
+          echo '=== Semantic adapter candidates ==='
+          grep -R -n 'ValidationContext\|Observe(' v22-runtime/src/LegalValidator v22-runtime/tests/LegalValidator.Tests | head -120 || true
       - name: Restore and locked baseline 124
         working-directory: v22-runtime
         run: |
