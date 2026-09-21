@@ -45,10 +45,25 @@ jobs:
           cd v22-runtime && dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V27StructuralQaTests 2>&1 | tee /tmp/v27-red.log
       - name: Prove structural RED genuine
         id: red_proof
+        if: always()
+        env:
+          STRUCTURAL_RED_OUTCOME: ${{ steps.structural_red.outcome }}
         run: |
-          test "${{ steps.structural_red.outcome }}" = failure
-          grep -Eq 'StructuralSnapshotter|StructuralQaService|StructuralQaVerdict|Nd30.LegalValidator.Qa' /tmp/v27-red.log
-          ! grep -Eq 'NU1301|Unable to load the service index|SDK.*not found|No such file or directory' /tmp/v27-red.log
+          python - <<'PY'
+          import os, pathlib, re, sys
+          outcome = os.environ.get('STRUCTURAL_RED_OUTCOME', '')
+          p = pathlib.Path('/tmp/v27-red.log')
+          text = p.read_text(encoding='utf-8', errors='replace') if p.exists() else ''
+          expected = re.search(r'StructuralSnapshotter|StructuralQaService|StructuralQaVerdict|Nd30\.LegalValidator\.Qa', text) is not None
+          infra = re.search(r'NU1301|Unable to load the service index|SDK.*not found|No such file or directory', text, re.I) is not None
+          print(f'structural_red_outcome={outcome} expected_missing_contract={expected} infrastructure_failure={infra} log_bytes={len(text.encode("utf-8"))}')
+          if outcome != 'failure':
+              sys.exit('Structural RED was not a genuine failed test/build step')
+          if not expected:
+              sys.exit('Structural RED log does not identify the intentionally missing V27 QA contract')
+          if infra:
+              sys.exit('Structural RED is contaminated by infrastructure failure')
+          PY
       - name: Structural GREEN
         id: structural_green
         run: |
