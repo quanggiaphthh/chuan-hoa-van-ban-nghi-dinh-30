@@ -44,7 +44,7 @@ jobs:
         working-directory: v22-runtime
         run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V25L4CIntentTests
       - name: Enforce authority RED
-        run: test "${{ steps.red_intent.outcome }}" = "failure"
+        run: test "${{ steps.red_intent.outcome }}" = failure
       - name: Materialize exact intent production
         run: python v25-runtime/materialize_v25_l4c.py --intent-production-only
       - name: Exact intent GREEN
@@ -59,9 +59,11 @@ jobs:
         working-directory: v22-runtime
         run: dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --filter FullyQualifiedName~V25L4CMutationTests
       - name: Enforce executor RED
-        run: test "${{ steps.red_executor.outcome }}" = "failure"
+        run: test "${{ steps.red_executor.outcome }}" = failure
       - name: Materialize executor production
-        run: python v25-runtime/materialize_v25_l4c.py --executor-production-only
+        run: |
+          python v25-runtime/materialize_v25_l4c.py --executor-production-only
+          python v25-runtime/correct_v25_l4c_openxml_enum.py
       - name: Build
         id: build
         working-directory: v22-runtime
