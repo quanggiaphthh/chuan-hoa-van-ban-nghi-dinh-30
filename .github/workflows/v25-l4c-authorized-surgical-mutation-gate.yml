@@ -26,7 +26,7 @@ jobs:
           python v25-runtime/materialize_v25_l2.py
           python v25-runtime/materialize_v25_l3.py
           python v25-runtime/materialize_v25_l4a.py
-          python v25-runtime/materialize_v25_l4b.py --production-only
+          python v25-runtime/materialize_v25_l4b.py
       - name: Apply confirmed CS1736 test-generator corrective
         run: python v25-runtime/correct_v25_l4c_test_default.py
       - name: Generate canonical fixtures
