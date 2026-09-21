@@ -54,7 +54,13 @@ jobs:
           outcome = os.environ.get('STRUCTURAL_RED_OUTCOME', '')
           p = pathlib.Path('/tmp/v27-red.log')
           text = p.read_text(encoding='utf-8', errors='replace') if p.exists() else ''
-          expected = re.search(r'StructuralSnapshotter|StructuralQaService|StructuralQaVerdict|Nd30\.LegalValidator\.Qa', text) is not None
+          named_contract = re.search(r'StructuralSnapshotter|StructuralQaService|StructuralQaVerdict', text) is not None
+          missing_qa_namespace = (
+              re.search(r'\bCS0234\b', text) is not None
+              and re.search(r"(?:type or namespace name\s+)?['\"]Qa['\"]", text, re.I) is not None
+              and re.search(r"namespace\s+['\"]Nd30\.LegalValidator['\"]", text, re.I) is not None
+          )
+          expected = named_contract or missing_qa_namespace
           infra = re.search(r'NU1301|Unable to load the service index|SDK.*not found|No such file or directory', text, re.I) is not None
           print(f'structural_red_outcome={outcome} expected_missing_contract={expected} infrastructure_failure={infra} log_bytes={len(text.encode("utf-8"))}')
           if outcome != 'failure':
