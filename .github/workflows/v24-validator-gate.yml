@@ -1,3 +1,4 @@
+# V25 L1 canonical runtime verification
 name: V24 Legal Validator Runtime Gate
 
 on:
@@ -5,6 +6,7 @@ on:
   push:
     branches:
       - feature/gd4-v24-validator-runtime
+      - feature/gd4-v25-l1-canonical-runtime
 
 permissions:
   contents: read
@@ -14,83 +16,57 @@ jobs:
   v24-validator:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install Python audit dependencies
         run: python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
-
-      - name: Show toolchain
-        run: |
-          dotnet --info
-          dotnet --list-sdks
-          python --version
-          python -c "import yaml; print('PyYAML', yaml.__version__)"
-
       - name: Bootstrap tested V23 source
         working-directory: v22-runtime
         run: |
           python scripts/v23/bootstrap_v23_payload.py
           python scripts/v23/apply_v23_runtime_corrections.py
-
       - name: Materialize compact V24 validator and verified catalog
         run: python v24-runtime/materialize_v24_compact.py
-
-      - name: Apply V24 runtime corrections
-        run: python v24-runtime/apply_v24_runtime_corrections.py
-
+      - name: V24 canonicalization guard
+        run: python v24-runtime/assert_v24_canonicalization.py
       - name: Generate deterministic V22 and V23 fixtures
         working-directory: v22-runtime
         run: |
           python scripts/v22/generate_docx_fixtures.py
           python scripts/v22/normalize_generated_fixtures.py
           python scripts/v23/generate_semantic_fixtures.py
-
       - name: Static V22 V23 V24 audits
         working-directory: v22-runtime
         run: |
           python scripts/v22/audit_v22_static.py
           python scripts/v23/audit_v23_static.py
           python scripts/v24/audit_v24_static.py
-
       - name: Restore
         id: restore
         continue-on-error: true
         working-directory: v22-runtime
-        run: |
-          set -o pipefail
-          dotnet restore DocumentEngine.slnx 2>&1 | tee restore-v24.log
-
+        run: dotnet restore DocumentEngine.slnx
       - name: Build
         id: build
         if: steps.restore.outcome == 'success'
         continue-on-error: true
         working-directory: v22-runtime
-        run: |
-          set -o pipefail
-          dotnet build DocumentEngine.slnx --no-restore -c Release 2>&1 | tee build-v24.log
-
+        run: dotnet build DocumentEngine.slnx --no-restore -c Release
       - name: Test
         id: test
         if: steps.build.outcome == 'success'
         continue-on-error: true
         working-directory: v22-runtime
-        run: |
-          set -o pipefail
-          dotnet test DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=v24-tests.trx" --logger "console;verbosity=detailed" 2>&1 | tee test-v24.log
-
+        run: dotnet test DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=v24-tests.trx" --logger "console;verbosity=detailed"
       - name: Final static regression
         id: regression
         if: steps.test.outcome == 'success'
@@ -99,43 +75,16 @@ jobs:
           python scripts/v22/audit_v22_static.py
           python scripts/v23/audit_v23_static.py
           python scripts/v24/audit_v24_static.py
-
       - name: Package tested V24 runtime source
+        id: package
         if: steps.test.outcome == 'success'
         working-directory: v22-runtime
         run: |
           rm -rf src/DocumentEngine/bin src/DocumentEngine/obj src/SemanticDetector/bin src/SemanticDetector/obj src/LegalValidator/bin src/LegalValidator/obj
           rm -rf tests/DocumentEngine.Tests/bin tests/DocumentEngine.Tests/obj tests/SemanticDetector.Tests/bin tests/SemanticDetector.Tests/obj tests/LegalValidator.Tests/bin tests/LegalValidator.Tests/obj
           find . -type d -name TestResults -prune -exec rm -rf {} +
-          rm -f restore-v24.log build-v24.log test-v24.log
           zip -qr ../v24-runtime-tested-source.zip . -x '.v23-payload/*'
           sha256sum ../v24-runtime-tested-source.zip > ../v24-runtime-tested-source.zip.sha256
-
-      - name: Publish diagnostics issue
-        if: steps.restore.outcome != 'success' || steps.build.outcome == 'failure' || steps.test.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            const base = path.join(process.env.GITHUB_WORKSPACE, 'v22-runtime');
-            const parts = [];
-            for (const f of ['restore-v24.log','build-v24.log','test-v24.log']) {
-              const p = path.join(base, f);
-              if (fs.existsSync(p)) {
-                let t = fs.readFileSync(p, 'utf8');
-                if (t.length > 50000) t = t.slice(-50000);
-                parts.push(`## ${f}\n\n\`\`\`text\n${t}\n\`\`\``);
-              }
-            }
-            const body = `Commit: ${context.sha}\nRun: ${context.runId}\n\n` + parts.join('\n\n');
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `V24 Validator Gate diagnostics ${context.sha.substring(0,7)}`,
-              body
-            });
-
       - name: Upload V24 results
         if: always()
         uses: actions/upload-artifact@v4
@@ -143,16 +92,15 @@ jobs:
           name: v24-validator-results
           path: |
             v22-runtime/**/TestResults/**
-            v22-runtime/*-v24.log
             v24-runtime-tested-source.zip
             v24-runtime-tested-source.zip.sha256
           if-no-files-found: warn
-
       - name: Enforce gate
         if: always()
         run: |
-          echo "restore=${{ steps.restore.outcome }} build=${{ steps.build.outcome }} test=${{ steps.test.outcome }} regression=${{ steps.regression.outcome }}"
+          echo "restore=${{ steps.restore.outcome }} build=${{ steps.build.outcome }} test=${{ steps.test.outcome }} regression=${{ steps.regression.outcome }} package=${{ steps.package.outcome }}"
           test "${{ steps.restore.outcome }}" = "success"
           test "${{ steps.build.outcome }}" = "success"
           test "${{ steps.test.outcome }}" = "success"
           test "${{ steps.regression.outcome }}" = "success"
+          test "${{ steps.package.outcome }}" = "success"
