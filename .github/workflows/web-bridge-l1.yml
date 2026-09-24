@@ -1,0 +1,60 @@
+name: Web Bridge L1 Gate
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [feature/gd4-v26-production-safe-autofix]
+permissions: {contents: read}
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-dotnet@v4
+        with: {dotnet-version: '10.0.x'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
+      - name: Materialize locked canonical baseline
+        run: |
+          cd v22-runtime && python scripts/v23/bootstrap_v23_payload.py && python scripts/v23/apply_v23_runtime_corrections.py && cd ..
+          python v24-runtime/materialize_v24_compact.py && python v24-runtime/assert_v24_canonicalization.py
+          python v25-runtime/materialize_v25_l2.py && python v25-runtime/materialize_v25_l3.py && python v25-runtime/materialize_v25_l4a.py && python v25-runtime/materialize_v25_l4b.py
+          python v25-runtime/correct_v25_l4c_test_default.py && python v25-runtime/materialize_v25_l4c.py
+          cd v22-runtime && python scripts/v22/generate_docx_fixtures.py && python scripts/v22/normalize_generated_fixtures.py && python scripts/v23/generate_semantic_fixtures.py && cd ..
+          python v26-runtime/materialize_v26_foundation.py --production-only && python v26-runtime/correct_v26_foundation.py
+          python v26-runtime/materialize_v26_atomic.py --tests-only
+          python v26-runtime/materialize_v26_atomic.py --production-only && python v26-runtime/correct_v26_atomic.py
+          python v26-runtime/materialize_v26_final_red.py
+          python v26-runtime/close_v26_final_gaps.py
+          python v26-runtime/correct_v26_final_namespace.py
+          rm -f v22-runtime/tests/LegalValidator.Tests/V26ProductionSafeAutofixTests.cs v22-runtime/tests/LegalValidator.Tests/V26AtomicExecutionTests.cs
+      - name: Canonical regression
+        working-directory: v22-runtime
+        run: |
+          dotnet restore DocumentEngine.slnx
+          dotnet test DocumentEngine.slnx -c Release --logger 'console;verbosity=minimal' | tee /tmp/regression
+          ! grep -E 'Failed:[[:space:]]+[1-9]' /tmp/regression
+      - name: Build thin web bridge
+        working-directory: v22-runtime
+        run: dotnet build src/Nd30.WebApi/Nd30.WebApi.csproj -c Release
+      - name: Analyze boundary smoke
+        working-directory: v22-runtime
+        run: |
+          ASPNETCORE_URLS=http://127.0.0.1:5080 dotnet run --no-build -c Release --project src/Nd30.WebApi/Nd30.WebApi.csproj >/tmp/web.log 2>&1 &
+          pid=$!
+          trap 'kill $pid || true; cat /tmp/web.log' EXIT
+          for i in {1..30}; do curl -sf http://127.0.0.1:5080/health >/dev/null && break || sleep 1; done
+          fixture=$(find tests -type f -name '*.docx' | head -n 1)
+          test -n "$fixture"
+          curl -sf -F "file=@$fixture" http://127.0.0.1:5080/api/v1/analyze -o /tmp/analyze.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/analyze.json'))
+          assert x.get('documentDigest')
+          assert isinstance(x.get('findings'), list)
+          assert isinstance(x.get('proposals'), list)
+          assert x.get('capabilities')
+          print('analyze findings',len(x['findings']),'proposals',len(x['proposals']))
+          PY
