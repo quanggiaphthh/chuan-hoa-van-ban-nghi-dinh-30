@@ -2,6 +2,7 @@ name: Web Bridge L1 Gate
 on:
   push:
     branches: [feature/web-bridge-l1]
+  pull_request: {}
   workflow_dispatch: {}
 permissions: {contents: read}
 
@@ -41,7 +42,7 @@ jobs:
           ND30_CANONICAL_ROOT="$PWD" ASPNETCORE_URLS=http://127.0.0.1:5080 dotnet run --no-build -c Release --project src/Nd30.WebApi/Nd30.WebApi.csproj > /tmp/nd30-web.log 2>&1 &
           pid=$!
           trap 'kill $pid 2>/dev/null || true; cat /tmp/nd30-web.log' EXIT
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:5080/ >/dev/null 2>&1 || true; if curl -s -o /dev/null http://127.0.0.1:5080/api/v1/analyze; then break; fi; sleep 1; done
+          sleep 2
           curl -fsS -F "file=@fixtures/v23/02-named-decision.docx" http://127.0.0.1:5080/api/v1/analyze > /tmp/analyze.json
           python - <<'PY'
           import json
