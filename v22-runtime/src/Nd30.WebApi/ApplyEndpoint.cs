@@ -1,11 +1,14 @@
 using System.Security.Cryptography;
-using Nd30.DocumentEngine;
-using Nd30.SemanticDetector;
-using Nd30.LegalValidator;
-using Nd30.LegalValidator.Rules;
-using Nd30.LegalValidator.Remediation;
+using Nd30.DocumentEngine.Parsing;
+using Nd30.LegalValidator.Adapters;
 using Nd30.LegalValidator.Authorization;
+using Nd30.LegalValidator.Catalog;
+using Nd30.LegalValidator.Evaluation;
 using Nd30.LegalValidator.Execution;
+using Nd30.LegalValidator.Model;
+using Nd30.LegalValidator.Remediation;
+using Nd30.LegalValidator.State;
+using Nd30.SemanticDetector.Detection;
 
 internal static class ApplyEndpoint
 {
@@ -21,38 +24,33 @@ internal static class ApplyEndpoint
             return Results.BadRequest(new { error = "file, documentDigest, selectedProposalIds and idempotencyKey are required" });
 
         var source = Path.Combine(Path.GetTempPath(), $"nd30-{Guid.NewGuid():N}.docx");
-        var output = Path.Combine(Path.GetTempPath(), $"nd30-{Guid.NewGuid():N}-output.docx");
         try
         {
             await using (var fs = File.Create(source)) await file.CopyToAsync(fs, ct);
-            var digest = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(source, ct))).ToLowerInvariant();
-            if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(digest), Convert.FromHexString(expectedDigest)))
+            var identity = DocumentIdentityService.FromFile(source);
+            if (!string.Equals(identity.Digest, expectedDigest, StringComparison.OrdinalIgnoreCase))
                 return Results.Conflict(new { error = "document digest mismatch" });
 
             var parsed = new DocxParser().Parse(source);
-            var semantic = new AdministrativeSemanticDetector().Detect(parsed);
-            var context = new SemanticValidationContextBuilder().Build(parsed, semantic);
-            var catalog = RuleCatalog.LoadVerified();
-            var validation = new ValidationEngine(catalog).Validate(context);
-            var proposals = new RemediationPlanner().Plan(validation);
-            var chosen = proposals.Where(p => selected.Contains(p.Id, StringComparer.Ordinal)).ToArray();
-            if (chosen.Length != selected.Length) return Results.BadRequest(new { error = "unknown or stale proposal" });
-            if (chosen.Any(p => p.Eligibility != AutofixEligibility.SafeAutofix)) return Results.BadRequest(new { error = "proposal is not safe-autofix eligible" });
+            if (parsed.Document is null) return Results.BadRequest(new { error = "DOCX could not be parsed." });
+            var semantic = new AdministrativeSemanticDetector().Detect(parsed.Document);
+            var context = SemanticValidationContextBuilder.Build(parsed.Document, semantic, DateOnly.FromDateTime(DateTime.UtcNow));
+            var catalog = RuleCatalog.LoadVerifiedRelease(Program.FindCanonicalRoot());
+            var report = new ValidationEngine(catalog).Validate(context);
+            var planner = new RemediationPlanner();
+            var requests = new List<AuthorizedMutationRequest>();
 
-            var intents = chosen.Select(p => MutationIntent.FromProposal(p)).ToArray();
-            var identity = DocumentIdentity.FromFile(source);
-            var artifact = AuthorizationArtifact.ForDocument(identity, intents);
-            var authorized = new AuthorizationBoundary().Authorize(identity, artifact, intents);
-            var plan = new MutationPlanFactory().Create(authorized, output, idempotencyKey);
-            var result = new AtomicMutationPlanExecutor(new CanonicalDocumentRevalidator(catalog)).Execute(plan);
-            if (!result.Succeeded || !File.Exists(output)) return Results.UnprocessableEntity(new { error = "canonical mutation/revalidation rejected" });
-            return Results.File(output, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "normalized.docx", enableRangeProcessing: false);
+            foreach (var result in report.Results)
+            {
+                var rule = RuleIdentity.From(result);
+                var proposal = planner.Propose(result, parsed.Document.Safety, "format", new DocumentStateBinding(identity, rule));
+                if (!selected.Contains(proposal.ProposalId, StringComparer.Ordinal)) continue;
+                if (!proposal.Executable) return Results.BadRequest(new { error = "proposal is not executable" });
+                return Results.BadRequest(new { error = "selected proposal requires canonical target/value materialization not exposed by validation result" });
+            }
+
+            return Results.BadRequest(new { error = "unknown or stale proposal" });
         }
-        catch (FormatException) { return Results.BadRequest(new { error = "invalid digest" }); }
-        finally
-        {
-            try { if (File.Exists(source)) File.Delete(source); } catch { }
-            // Results.File streams after handler return, so output cleanup is intentionally delegated to OS temp lifecycle.
-        }
+        finally { try { if (File.Exists(source)) File.Delete(source); } catch { } }
     }
 }
