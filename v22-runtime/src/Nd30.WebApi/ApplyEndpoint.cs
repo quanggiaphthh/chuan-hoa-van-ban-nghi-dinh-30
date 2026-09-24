@@ -1,10 +1,8 @@
-using System.Security.Cryptography;
 using Nd30.DocumentEngine.Parsing;
 using Nd30.LegalValidator.Adapters;
 using Nd30.LegalValidator.Authorization;
 using Nd30.LegalValidator.Catalog;
 using Nd30.LegalValidator.Evaluation;
-using Nd30.LegalValidator.Execution;
 using Nd30.LegalValidator.Model;
 using Nd30.LegalValidator.Remediation;
 using Nd30.LegalValidator.State;
@@ -35,10 +33,9 @@ internal static class ApplyEndpoint
             if (parsed.Document is null) return Results.BadRequest(new { error = "DOCX could not be parsed." });
             var semantic = new AdministrativeSemanticDetector().Detect(parsed.Document);
             var context = SemanticValidationContextBuilder.Build(parsed.Document, semantic, DateOnly.FromDateTime(DateTime.UtcNow));
-            var catalog = RuleCatalog.LoadVerifiedRelease(Program.FindCanonicalRoot());
+            var catalog = RuleCatalog.LoadVerifiedRelease(FindCanonicalRoot());
             var report = new ValidationEngine(catalog).Validate(context);
             var planner = new RemediationPlanner();
-            var requests = new List<AuthorizedMutationRequest>();
 
             foreach (var result in report.Results)
             {
@@ -52,5 +49,19 @@ internal static class ApplyEndpoint
             return Results.BadRequest(new { error = "unknown or stale proposal" });
         }
         finally { try { if (File.Exists(source)) File.Delete(source); } catch { } }
+    }
+
+    private static string FindCanonicalRoot()
+    {
+        var configured = Environment.GetEnvironmentVariable("ND30_CANONICAL_ROOT");
+        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(Path.Combine(configured, "release", "admin-nd30-verified-rc-v20.yaml")))
+            return configured;
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "release", "admin-nd30-verified-rc-v20.yaml"))) return directory.FullName;
+            directory = directory.Parent;
+        }
+        throw new DirectoryNotFoundException("Canonical ND30 release root not found.");
     }
 }
