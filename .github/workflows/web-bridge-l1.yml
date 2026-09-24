@@ -1,0 +1,53 @@
+name: Web Bridge L1 Gate
+on:
+  push:
+    branches: [feature/web-bridge-l1]
+  workflow_dispatch: {}
+permissions: {contents: read}
+
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-dotnet@v4
+        with: {dotnet-version: '10.0.x'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
+      - name: Materialize locked canonical engine
+        run: |
+          cd v22-runtime && python scripts/v23/bootstrap_v23_payload.py && python scripts/v23/apply_v23_runtime_corrections.py && cd ..
+          python v24-runtime/materialize_v24_compact.py
+          python v25-runtime/materialize_v25_l2.py && python v25-runtime/materialize_v25_l3.py && python v25-runtime/materialize_v25_l4a.py && python v25-runtime/materialize_v25_l4b.py
+          python v25-runtime/correct_v25_l4c_test_default.py && python v25-runtime/materialize_v25_l4c.py
+          cd v22-runtime && python scripts/v22/generate_docx_fixtures.py && python scripts/v22/normalize_generated_fixtures.py && python scripts/v23/generate_semantic_fixtures.py && cd ..
+          python v26-runtime/materialize_v26_foundation.py --production-only && python v26-runtime/correct_v26_foundation.py
+          python v26-runtime/materialize_v26_atomic.py --production-only && python v26-runtime/correct_v26_atomic.py
+          python v26-runtime/materialize_v26_final_red.py
+          python v26-runtime/close_v26_final_gaps.py
+          python v26-runtime/correct_v26_final_namespace.py
+      - name: Canonical regression
+        working-directory: v22-runtime
+        run: dotnet test DocumentEngine.slnx -c Release --logger 'console;verbosity=minimal'
+      - name: Build thin web bridge
+        working-directory: v22-runtime
+        run: dotnet build src/Nd30.WebApi/Nd30.WebApi.csproj -c Release
+      - name: Analyze boundary smoke
+        working-directory: v22-runtime
+        run: |
+          ND30_CANONICAL_ROOT="$PWD" ASPNETCORE_URLS=http://127.0.0.1:5080 dotnet run --no-build -c Release --project src/Nd30.WebApi/Nd30.WebApi.csproj > /tmp/nd30-web.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true; cat /tmp/nd30-web.log' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:5080/ >/dev/null 2>&1 || true; if curl -s -o /dev/null http://127.0.0.1:5080/api/v1/analyze; then break; fi; sleep 1; done
+          curl -fsS -F "file=@fixtures/v23/02-named-decision.docx" http://127.0.0.1:5080/api/v1/analyze > /tmp/analyze.json
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/analyze.json',encoding='utf-8'))
+          assert len(x['documentDigest']) == 64
+          assert isinstance(x['findings'], list) and len(x['findings']) == 435
+          assert x['capabilities']['paragraph.alignment'] == 'SAFE_AUTOFIX'
+          assert x['capabilities']['font.family'] == 'DETECT_ONLY'
+          PY
