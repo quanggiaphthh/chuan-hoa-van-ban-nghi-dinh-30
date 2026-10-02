@@ -1,0 +1,144 @@
+{
+  "01-official-letter.docx": {
+    "class": "OfficialLetter",
+    "specific": "cong_van",
+    "review": false,
+    "template": "ND30.PL3.TEMPLATE_1_5",
+    "roles": [
+      "NationalHeader",
+      "NationalMotto",
+      "DocumentNumber",
+      "DocumentNotation",
+      "IssuePlaceAndDate",
+      "SubjectOfficialLetter",
+      "Addressee",
+      "IssuingAuthority",
+      "RecipientList",
+      "RetentionLine"
+    ]
+  },
+  "02-named-decision.docx": {
+    "class": "NamedAdministrativeDocument",
+    "specific": "quyet_dinh",
+    "review": true,
+    "template": null,
+    "roles": [
+      "DocumentTypeHeading",
+      "SubjectNamedDocument",
+      "LegalBasisBlock",
+      "ArticleHeading",
+      "Clause",
+      "Point"
+    ]
+  },
+  "03-ambiguous-type.docx": {
+    "class": "Unknown",
+    "specific": null,
+    "review": true,
+    "template": null,
+    "roles": [
+      "DocumentTypeHeading",
+      "SubjectOfficialLetter",
+      "Addressee"
+    ]
+  },
+  "04-table-header.docx": {
+    "class": "NamedAdministrativeDocument",
+    "specific": "bao_cao",
+    "review": false,
+    "template": "ND30.PL3.TEMPLATE_1_4",
+    "roles": [
+      "NationalHeader",
+      "NationalMotto",
+      "IssuingAuthorityParent",
+      "IssuingAuthority",
+      "DocumentTypeHeading",
+      "SubjectNamedDocument"
+    ]
+  },
+  "05-unusual-spacing.docx": {
+    "class": "NamedAdministrativeDocument",
+    "specific": "thong_bao",
+    "review": false,
+    "template": "ND30.PL3.TEMPLATE_1_4",
+    "roles": [
+      "NationalHeader",
+      "NationalMotto",
+      "DocumentTypeHeading",
+      "SubjectNamedDocument"
+    ]
+  },
+  "06-multiple-type-candidates.docx": {
+    "class": "Unknown",
+    "specific": null,
+    "review": true,
+    "template": null,
+    "roles": [
+      "DocumentTypeHeading"
+    ]
+  },
+  "07-appendix.docx": {
+    "class": "Appendix",
+    "specific": "phu_luc",
+    "review": true,
+    "template": null,
+    "roles": [
+      "AppendixNumber",
+      "AppendixTitle",
+      "AppendixReference"
+    ]
+  },
+  "08-copy.docx": {
+    "class": "Copy",
+    "specific": "ban_sao",
+    "review": true,
+    "template": null,
+    "roles": [
+      "CopyFormHeading",
+      "CopyAuthority",
+      "SigningAuthorityPrefix",
+      "SignerName",
+      "CopyCertificationSignature"
+    ]
+  },
+  "09-hierarchy.docx": {
+    "class": "NamedAdministrativeDocument",
+    "specific": "quy_dinh",
+    "review": false,
+    "template": "ND30.PL3.TEMPLATE_1_4",
+    "roles": [
+      "PartHeading",
+      "ChapterHeading",
+      "SectionHeading",
+      "SubsectionHeading",
+      "ArticleHeading",
+      "Clause",
+      "Point"
+    ]
+  },
+  "10-missing-components.docx": {
+    "class": "Unknown",
+    "specific": null,
+    "review": true,
+    "template": null,
+    "roles": [
+      "Body"
+    ]
+  },
+  "11-markings-signature.docx": {
+    "class": "NamedAdministrativeDocument",
+    "specific": "thong_bao",
+    "review": false,
+    "template": "ND30.PL3.TEMPLATE_1_4",
+    "roles": [
+      "UrgencyMark",
+      "ClassificationMark",
+      "CirculationInstruction",
+      "SigningAuthorityPrefix",
+      "SignerTitle",
+      "SignerName",
+      "IssuedCopyCount",
+      "ContactInformation"
+    ]
+  }
+}

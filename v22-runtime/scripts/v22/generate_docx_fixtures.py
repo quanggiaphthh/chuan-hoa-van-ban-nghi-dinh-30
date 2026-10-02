@@ -1,5 +1,9 @@
 import zipfile, pathlib
 R=pathlib.Path('fixtures/docx'); R.mkdir(parents=True,exist_ok=True)
+ZIP_TIME=(1980,1,1,0,0,0)
+def add_entry(archive,name,data):
+ info=zipfile.ZipInfo(name,ZIP_TIME);info.compress_type=zipfile.ZIP_DEFLATED;info.create_system=3;info.external_attr=0o600<<16
+ archive.writestr(info,data)
 W='http://schemas.openxmlformats.org/wordprocessingml/2006/main'; RR='http://schemas.openxmlformats.org/officeDocument/2006/relationships'; PR='http://schemas.openxmlformats.org/package/2006/relationships'; CTNS='http://schemas.openxmlformats.org/package/2006/content-types'
 TYPES={
  'word/document.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml','word/styles.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml','word/settings.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml','word/numbering.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml','word/header1.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml','word/header2.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml','word/header3.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml','word/footer1.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml','word/footer2.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml','word/footer3.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml','word/comments.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml','word/footnotes.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml','word/endnotes.xml':'application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml','word/vbaProject.bin':'application/vnd.ms-office.vbaProject','word/embeddings/oleObject1.bin':'application/vnd.openxmlformats-officedocument.oleObject','_xmlsignatures/origin.sigs':'application/vnd.openxmlformats-package.digital-signature-origin','_xmlsignatures/sig1.xml':'application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml'}
@@ -18,10 +22,11 @@ def mk(name,body,styles='',settings='',parts=None,rels='',macro=False,finalsect=
  base={'word/document.xml':doc,'word/styles.xml':st,'word/settings.xml':se,'word/_rels/document.xml.rels':f'<?xml version="1.0"?><Relationships xmlns="{PR}"><Relationship Id="rStyles" Type="{RR}/styles" Target="styles.xml"/><Relationship Id="rSettings" Type="{RR}/settings" Target="settings.xml"/>{rels}</Relationships>'};base.update(parts)
  root=f'<?xml version="1.0"?><Relationships xmlns="{PR}"><Relationship Id="rId1" Type="{RR}/officeDocument" Target="word/document.xml"/>{rootextra}</Relationships>'
  with zipfile.ZipFile(R/name,'w',zipfile.ZIP_DEFLATED) as z:
-  z.writestr('[Content_Types].xml',cts(base,macro));z.writestr('_rels/.rels',root)
-  for k,v in base.items():z.writestr(k,v)
+  add_entry(z,'[Content_Types].xml',cts(base,macro));add_entry(z,'_rels/.rels',root)
+  for k,v in base.items():add_entry(z,k,v)
 p=lambda text:f'<w:p><w:r><w:t>{text}</w:t></w:r></w:p>'
 mk('01-simple.docx',p('Hello'))
+mk('23-direct-alignment.docx','<w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:t>Direct alignment target</w:t></w:r></w:p>')
 mk('02-paragraph-style.docx','<w:p><w:pPr><w:pStyle w:val="Body"/></w:pPr><w:r><w:t>Styled</w:t></w:r></w:p>','<w:style w:type="paragraph" w:styleId="Body"><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="120"/></w:pPr><w:rPr><w:sz w:val="30"/></w:rPr></w:style>')
 mk('03-inherited-style.docx','<w:p><w:pPr><w:pStyle w:val="Child"/></w:pPr><w:r><w:rPr><w:rStyle w:val="Emphasis"/></w:rPr><w:t>Inherited</w:t></w:r></w:p>','<w:style w:type="paragraph" w:styleId="Base"><w:rPr><w:b/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Child"><w:basedOn w:val="Base"/><w:rPr><w:color w:val="112233"/></w:rPr></w:style><w:style w:type="character" w:styleId="Emphasis"><w:rPr><w:i/></w:rPr></w:style>')
 mk('04-direct-override.docx','<w:p><w:pPr><w:pStyle w:val="Body"/></w:pPr><w:r><w:rPr><w:b w:val="false"/><w:i/><w:sz w:val="32"/></w:rPr><w:t>Override</w:t></w:r></w:p>','<w:style w:type="paragraph" w:styleId="Body"><w:rPr><w:b/></w:rPr></w:style>')

@@ -9,4 +9,7 @@
     <ProjectReference Include="../DocumentEngine/DocumentEngine.csproj" />
     <ProjectReference Include="../SemanticDetector/SemanticDetector.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="LegalValidator.Tests" />
+  </ItemGroup>
 </Project>

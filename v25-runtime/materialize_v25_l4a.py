@@ -10,6 +10,7 @@ if not args.tests_only:
  STATE.parent.mkdir(parents=True,exist_ok=True)
  STATE.write_text(r'''using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using Nd30.DocumentEngine.Safety;
 using Nd30.LegalValidator.Model;
 namespace Nd30.LegalValidator.State;
 public sealed record DocumentIdentity(string Algorithm,string Digest,string Scope="whole-document-bytes") {
@@ -17,7 +18,7 @@ public sealed record DocumentIdentity(string Algorithm,string Digest,string Scop
  public static bool IsValid(DocumentIdentity? x)=>x is not null&&x.Algorithm==SupportedAlgorithm&&x.Scope=="whole-document-bytes"&&Regex.IsMatch(x.Digest,"^[0-9a-f]{64}$",RegexOptions.CultureInvariant);
 }
 public static class DocumentIdentityService {
- public static DocumentIdentity FromFile(string path){using var s=File.OpenRead(path);return new(DocumentIdentity.SupportedAlgorithm,Convert.ToHexString(SHA256.HashData(s)).ToLowerInvariant());}
+ public static DocumentIdentity FromFile(string path,CancellationToken cancellationToken=default){try{cancellationToken.ThrowIfCancellationRequested();var info=new FileInfo(path);if(!info.Exists)throw new DocumentPackageException("MALFORMED_DOCX","The DOCX package could not be read.");if(info.Length>PackageSafetyLimits.MaximumCompressedInputBytes)throw new DocumentPackageException("INPUT_TOO_LARGE","The DOCX input exceeds the allowed size.");using var s=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read,64*1024,FileOptions.SequentialScan);using var hash=IncrementalHash.CreateHash(HashAlgorithmName.SHA256);var buffer=new byte[64*1024];long total=0;while(true){cancellationToken.ThrowIfCancellationRequested();var read=s.Read(buffer,0,buffer.Length);if(read==0)break;total=checked(total+read);if(total>PackageSafetyLimits.MaximumCompressedInputBytes)throw new DocumentPackageException("INPUT_TOO_LARGE","The DOCX input exceeds the allowed size.");hash.AppendData(buffer,0,read);}return new(DocumentIdentity.SupportedAlgorithm,Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant());}catch(DocumentPackageException){throw;}catch(OperationCanceledException){throw;}catch(Exception){throw new DocumentPackageException("MALFORMED_DOCX","The DOCX package could not be read.");}}
 }
 public sealed record RuleIdentity(string RuleId,string SourceId,string SourceLocator) {
  public static RuleIdentity From(ValidationResult r)=>new(r.RuleId,r.Source.SourceId,r.Source.Locator);
@@ -46,6 +47,7 @@ public static class StaleStateVerifier {
 if not args.production_only:
  TEST.write_text(r'''using Xunit;
 using Nd30.DocumentEngine.Model;
+using Nd30.DocumentEngine.Safety;
 using Nd30.LegalValidator.Model;
 using Nd30.LegalValidator.Remediation;
 using Nd30.LegalValidator.State;
@@ -55,6 +57,7 @@ public sealed class V25L4ADocumentIdentityTests {
  static ValidationResult Finding()=>new("RULE.1",ValidationStatus.FAIL,"LEGAL_ERROR",new("SRC","loc"),new("paragraph","title","font"),"Times New Roman","Arial",[new("semantic_component_detection",EvidenceAuthority.Authoritative,"ev-1",1,false,new Dictionary<string,string>{{"target_id","p-1"}})],[],[],"applicable",1,PatchEligibility.ELIGIBLE,"test");
  static PackageSafetyState Safety()=>new(true,false,false,false,false,false,false,[],PatchPolicy.NORMAL,[]);
  [Fact] public void Exact_same_bytes_have_same_identity(){var p=Temp([1,2,3]);try{Assert.Equal(DocumentIdentityService.FromFile(p),DocumentIdentityService.FromFile(p));}finally{File.Delete(p);}}
+ [Fact] public void Oversized_identity_input_is_rejected_before_hashing(){var p=Temp([0]);using(var s=new FileStream(p,FileMode.Open,FileAccess.Write,FileShare.None)){s.SetLength(PackageSafetyLimits.MaximumCompressedInputBytes+1);}try{var e=Assert.Throws<DocumentPackageException>(()=>DocumentIdentityService.FromFile(p));Assert.Equal("INPUT_TOO_LARGE",e.Code);}finally{File.Delete(p);}}
  [Fact] public void Changed_bytes_change_identity(){var a=Temp([1,2,3]);var b=Temp([1,2,4]);try{Assert.NotEqual(DocumentIdentityService.FromFile(a),DocumentIdentityService.FromFile(b));}finally{File.Delete(a);File.Delete(b);}}
  [Fact] public void Identity_is_canonical_sha256_lower_hex(){var p=Temp([9,8,7]);try{var x=DocumentIdentityService.FromFile(p);Assert.Equal("SHA-256",x.Algorithm);Assert.Equal("whole-document-bytes",x.Scope);Assert.Matches("^[0-9a-f]{64}$",x.Digest);}finally{File.Delete(p);}}
  [Fact] public void Proposal_has_explicit_state_binding_and_preserves_provenance(){var p=Temp([1]);try{var f=Finding();var bind=new DocumentStateBinding(DocumentIdentityService.FromFile(p),RuleIdentity.From(f));var q=new RemediationPlanner().Propose(f,Safety(),stateBinding:bind);Assert.Equal(bind,q.StateBinding);Assert.Equal("RULE.1",q.RuleId);Assert.Contains("RULE.1",q.FindingReference);Assert.Equal(["ev-1"],q.EvidenceReferences);}finally{File.Delete(p);}}

@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 from pathlib import Path
-from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import tempfile, os
 
 ROOT = Path(__file__).resolve().parents[2] / "fixtures" / "docx"
+ZIP_TIME = (1980, 1, 1, 0, 0, 0)
+
+def add_entry(archive, name, data):
+    info = ZipInfo(name, ZIP_TIME)
+    info.compress_type = ZIP_DEFLATED
+    info.create_system = 3
+    info.external_attr = 0o600 << 16
+    archive.writestr(info, data)
 
 def rewrite(path: Path, transform):
     with ZipFile(path, "r") as zin:
@@ -15,7 +23,7 @@ def rewrite(path: Path, transform):
     try:
         with ZipFile(tmp, "w", ZIP_DEFLATED) as zout:
             for name, data in entries.items():
-                zout.writestr(name, data)
+                add_entry(zout, name, data)
         os.replace(tmp, path)
     finally:
         if os.path.exists(tmp):

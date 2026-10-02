@@ -1,0 +1,130 @@
+name: Document Processor .NET 10 Verification
+
+on:
+  push:
+    branches: [codex/processor-canonical-20261002]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: document-processor-dotnet10-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify source and toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor f55d82be4657f9da6bee594325d2cccb26c995ff HEAD
+          git diff --check f55d82be4657f9da6bee594325d2cccb26c995ff..HEAD
+          dotnet --info
+          python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
+      - name: Regenerate and require zero source drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd v22-runtime && python scripts/v23/bootstrap_v23_payload.py && python scripts/v23/apply_v23_runtime_corrections.py)
+          python v24-runtime/materialize_v24_compact.py
+          python v24-runtime/assert_v24_canonicalization.py
+          python v25-runtime/materialize_v25_l2.py
+          python v25-runtime/materialize_v25_l3.py
+          python v25-runtime/materialize_v25_l4a.py
+          python v25-runtime/materialize_v25_l4b.py
+          python v25-runtime/correct_v25_l4c_test_default.py
+          python v25-runtime/materialize_v25_l4c.py
+          (cd v22-runtime && python scripts/v22/generate_docx_fixtures.py && python scripts/v22/normalize_generated_fixtures.py && python scripts/v23/generate_semantic_fixtures.py)
+          python v22-runtime/scripts/v22/apply_document_security_corrective.py
+          python v26-runtime/materialize_v26_foundation.py --tests-only
+          python v26-runtime/materialize_v26_foundation.py --production-only
+          python v26-runtime/correct_v26_foundation.py
+          python v26-runtime/materialize_v26_atomic.py --tests-only
+          python v26-runtime/materialize_v26_atomic.py --production-only
+          python v26-runtime/correct_v26_atomic.py
+          python v26-runtime/materialize_v26_final_red.py
+          python v26-runtime/close_v26_final_gaps.py
+          python v26-runtime/correct_v26_final_namespace.py
+          rm -f v22-runtime/tests/LegalValidator.Tests/V26ProductionSafeAutofixTests.cs v22-runtime/tests/LegalValidator.Tests/V26AtomicExecutionTests.cs
+          python v22-runtime/scripts/v22/apply_document_security_corrective.py
+          python v22-runtime/scripts/v22/apply_document_host_corrective.py
+          git diff --exit-code
+          test -z "$(git ls-files --others --exclude-standard)"
+      - name: Verify materializers and static safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          python v22-runtime/scripts/v22/test_apply_document_security_corrective.py
+          python v22-runtime/scripts/v22/test_apply_document_host_corrective.py
+          python v22-runtime/scripts/v23/test_apply_v23_runtime_corrections.py
+          python v25-runtime/test_correct_v25_l4c_test_default.py
+          (cd v22-runtime && python scripts/v22/audit_v22_static.py && python scripts/v22/audit_document_security_corrective.py && python scripts/v23/audit_v23_static.py && python scripts/v24/audit_v24_static.py)
+      - name: Restore and build with .NET 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore v22-runtime/DocumentEngine.slnx
+          dotnet build v22-runtime/DocumentEngine.slnx -c Release --no-restore
+      - name: Targeted DOCX security, processor, authorization, and mutation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet test v22-runtime/tests/DocumentEngine.Tests/DocumentEngine.Tests.csproj -c Release --no-build --filter FullyQualifiedName~PackageSafetyPreflightTests
+          dotnet test v22-runtime/tests/LegalValidator.Tests/LegalValidator.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName~DocumentProcessorServiceTests|FullyQualifiedName~V25L4BAuthorizationTests|FullyQualifiedName~V25L4CIntentTests|FullyQualifiedName~V25L4CMutationTests|FullyQualifiedName~V26FinalAuthorityRevalidationTests|FullyQualifiedName~V26PreservedExecutionSafetyTests'
+      - name: Full solution regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet test v22-runtime/DocumentEngine.slnx -c Release --no-build --logger 'trx;LogFileName=full.trx' --logger 'console;verbosity=normal'
+          python - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          paths = sorted(Path('v22-runtime/tests').glob('*/TestResults/full.trx'))
+          if len(paths) != 3:
+              raise SystemExit(f'Expected three .NET test project TRX files; found {len(paths)}: {paths}')
+          overall = [0, 0, 0]
+          for path in paths:
+              counters = ET.parse(path).find('.//{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}Counters')
+              if counters is None:
+                  raise SystemExit(f'Missing counters: {path}')
+              total = int(counters.attrib['total'])
+              passed = int(counters.attrib['passed'])
+              failed = int(counters.attrib['failed'])
+              skipped = int(counters.attrib.get('notExecuted', '0'))
+              print(f'{path.parent.parent.name}: total={total} passed={passed} failed={failed} skipped={skipped}')
+              if total == 0 or failed or skipped or passed != total:
+                  raise SystemExit(f'Non-passing .NET project: {path}')
+              overall[0] += passed
+              overall[1] += failed
+              overall[2] += skipped
+          print(f'OVERALL passed={overall[0]} failed={overall[1]} skipped={overall[2]}')
+          PY
+      - name: Loopback host authentication, safe errors, and DOCX round-trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          python v22-runtime/scripts/v22/test_document_processor_host_boundary.py
+      - name: Upload bounded test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: document-processor-dotnet10-test-results
+          path: v22-runtime/tests/*/TestResults/full.trx
+          if-no-files-found: warn
+          retention-days: 7

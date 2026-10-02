@@ -58,18 +58,20 @@ public sealed class RuleEvaluator
         {
             var m=RuleCatalog.AsMap(raw);var field=RuleCatalog.ScalarString(RuleCatalog.Get(m,"field"));var op=RuleCatalog.ScalarString(RuleCatalog.Get(m,"operator"));var expected=RuleCatalog.Get(m,"value");
             if(!c.Fields.TryGetValue(field,out var actual))return (ValidationStatus.NOT_EVALUATED,$"Applicability field unavailable: {field}.");
-            if(!Condition(op,actual,expected))return (ValidationStatus.NOT_APPLICABLE,$"Applicability condition is false: {field} {op} {Fmt(expected)}.");
+            var condition=Condition(op,actual,expected);
+            if(condition is null)return (ValidationStatus.NOT_EVALUATED,$"Applicability operator is unsupported: {op}.");
+            if(condition==false)return (ValidationStatus.NOT_APPLICABLE,$"Applicability condition is false: {field} {op} {Fmt(expected)}.");
         }
         return (ValidationStatus.PASS,"Applicability conditions satisfied.");
     }
 
-    private static bool Condition(string op,object? actual,object? expected)=>op switch
+    private static bool? Condition(string op,object? actual,object? expected)=>op switch
     {
         "equals"=>Eq(actual,expected),
         "not_equals"=>!Eq(actual,expected),
         "in"=>RuleCatalog.AsList(expected).Any(x=>Eq(actual,x)),
         "greater_than_or_equal"=>Num(actual,out var a)&&Num(expected,out var e)&&a>=e,
-        _=>false
+        _=>null
     };
 
     private static bool HasRequiredAuthoritativeEvidence(RuleDefinition r,ValidationContext c,out string reason)

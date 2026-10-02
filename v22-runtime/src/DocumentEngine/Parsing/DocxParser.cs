@@ -3,7 +3,110 @@ namespace Nd30.DocumentEngine.Parsing;
 public sealed class DocxParser {
  const string Wns="http://schemas.openxmlformats.org/wordprocessingml/2006/main";
  static string Attr(OpenXmlElement? e,string local){if(e is null)return "";foreach(var a in e.GetAttributes())if(a.LocalName==local&&a.NamespaceUri==Wns)return a.Value??"";return "";}
- public ParseResult Parse(string path){var safety=PackageSafetyPreflight.Inspect(path);var diags=new List<Diagnostic>(safety.Diagnostics);if(!safety.IsReadable)return new(null,diags);try{using var d=WordprocessingDocument.Open(path,false);var main=d.MainDocumentPart??throw new InvalidDataException("Missing MainDocumentPart");var body=main.Document.Body??throw new InvalidDataException("Missing body");var paras=body.Elements<W.Paragraph>().Select((p,i)=>P(p,$"p{i+1}")).ToList();var tables=body.Elements<W.Table>().Select((t,i)=>T(t,$"t{i+1}")).ToList();var secs=Sections(main);var heads=main.HeaderParts.Select((h,i)=>new HeaderModel($"h{i+1}",main.GetIdOfPart(h),h.Header.Elements<W.Paragraph>().Select((p,j)=>P(p,$"h{i+1}.p{j+1}")).ToList())).ToList();var foots=main.FooterParts.Select((f,i)=>new FooterModel($"f{i+1}",main.GetIdOfPart(f),f.Footer.Elements<W.Paragraph>().Select((p,j)=>P(p,$"f{i+1}.p{j+1}")).ToList())).ToList();var rel=Relationships(main);var ro=new List<string>();if(main.FootnotesPart!=null)ro.Add("footnotes");if(main.EndnotesPart!=null)ro.Add("endnotes");if(main.WordprocessingCommentsPart!=null)ro.Add("comments");return new(new DocumentModel("doc",paras,tables,secs,heads,foots,Numbering(main),Styles(main),rel,safety,ro),diags);}catch(Exception ex){diags.Add(new("PARSE_ERROR",ex.Message));return new(null,diags);}}
+ public ParseResult Parse(string path)
+ {
+  try
+  {
+   using var input = File.OpenRead(path);
+   using var snapshot = SafeDocxSnapshot.CreateAsync(input, CancellationToken.None).GetAwaiter().GetResult();
+   return Parse(snapshot, CancellationToken.None);
+  }
+  catch (DocumentPackageException ex)
+  {
+   return new(null, [new Diagnostic(ex.Code, ex.SafeMessage)]);
+  }
+  catch (Exception)
+  {
+   return new(null, [new Diagnostic("MALFORMED_DOCX", "The DOCX package could not be read.")]);
+  }
+ }
+ public ParseResult Parse(SafeDocxSnapshot snapshot) => Parse(snapshot, CancellationToken.None);
+
+ public ParseResult Parse(SafeDocxSnapshot snapshot, CancellationToken cancellationToken)
+ {
+  ArgumentNullException.ThrowIfNull(snapshot);
+  try
+  {
+   cancellationToken.ThrowIfCancellationRequested();
+   snapshot.EnsureUnchanged();
+   var safety = snapshot.Safety;
+   var diagnostics = new List<Diagnostic>(safety.Diagnostics);
+   if (!safety.IsReadable) return new(null, diagnostics);
+   using var document = WordprocessingDocument.Open(snapshot.StagedPath, false, new OpenSettings { MaxCharactersInPart = PackageSafetyLimits.MaximumXmlCharactersPerPart });
+   cancellationToken.ThrowIfCancellationRequested();
+   var main = document.MainDocumentPart ?? throw new InvalidDataException();
+   var body = main.Document.Body ?? throw new InvalidDataException();
+   var paragraphs = new List<ParagraphModel>();
+   var paragraphIndex = 0;
+   foreach (var paragraph in body.Elements<W.Paragraph>())
+   {
+    cancellationToken.ThrowIfCancellationRequested();
+    paragraphs.Add(P(paragraph, $"p{++paragraphIndex}"));
+   }
+   var tables = new List<TableModel>();
+   var tableIndex = 0;
+   foreach (var table in body.Elements<W.Table>())
+   {
+    cancellationToken.ThrowIfCancellationRequested();
+    tables.Add(T(table, $"t{++tableIndex}"));
+   }
+   cancellationToken.ThrowIfCancellationRequested();
+   var sections = Sections(main);
+   var headers = new List<HeaderModel>();
+   var headerIndex = 0;
+   foreach (var part in main.HeaderParts)
+   {
+    cancellationToken.ThrowIfCancellationRequested();
+    var headerId = $"h{++headerIndex}";
+    var headerParagraphs = new List<ParagraphModel>();
+    var index = 0;
+    foreach (var paragraph in part.Header.Elements<W.Paragraph>())
+    {
+     cancellationToken.ThrowIfCancellationRequested();
+     headerParagraphs.Add(P(paragraph, $"{headerId}.p{++index}"));
+    }
+    headers.Add(new HeaderModel(headerId, main.GetIdOfPart(part), headerParagraphs));
+   }
+   var footers = new List<FooterModel>();
+   var footerIndex = 0;
+   foreach (var part in main.FooterParts)
+   {
+    cancellationToken.ThrowIfCancellationRequested();
+    var footerId = $"f{++footerIndex}";
+    var footerParagraphs = new List<ParagraphModel>();
+    var index = 0;
+    foreach (var paragraph in part.Footer.Elements<W.Paragraph>())
+    {
+     cancellationToken.ThrowIfCancellationRequested();
+     footerParagraphs.Add(P(paragraph, $"{footerId}.p{++index}"));
+    }
+    footers.Add(new FooterModel(footerId, main.GetIdOfPart(part), footerParagraphs));
+   }
+   cancellationToken.ThrowIfCancellationRequested();
+   var relationships = Relationships(main);
+   var readOnlyParts = new List<string>();
+   if (main.FootnotesPart is not null) readOnlyParts.Add("footnotes");
+   if (main.EndnotesPart is not null) readOnlyParts.Add("endnotes");
+   if (main.WordprocessingCommentsPart is not null) readOnlyParts.Add("comments");
+   var model = new DocumentModel("doc", paragraphs, tables, sections, headers, footers, Numbering(main), Styles(main), relationships, safety, readOnlyParts);
+   cancellationToken.ThrowIfCancellationRequested();
+   snapshot.EnsureUnchanged();
+   return new(model, diagnostics);
+  }
+  catch (OperationCanceledException)
+  {
+   if (cancellationToken.IsCancellationRequested) throw;
+   return new(null, [new Diagnostic("PROCESSING_CANCELLED", "DOCX processing was cancelled.")]);
+  }
+  catch (DocumentPackageException ex)
+  {
+   return new(null, [new Diagnostic(ex.Code, ex.SafeMessage)]);
+  }
+  catch (Exception)
+  {
+   return new(null, [new Diagnostic("MALFORMED_DOCX", "A DOCX part could not be parsed safely.")]);
+  }
+ }
  static ParagraphModel P(W.Paragraph p,string id){var fields=Fields(p,id);var runs=p.Elements<W.Run>().Select((r,i)=>new RunModel($"{id}.r{i+1}",r.InnerText,r.RunProperties?.RunStyle?.Val?.Value,F.Run(r.RunProperties),fields.Where(f=>f.SourceRunIds.Contains($"{id}.r{i+1}")).ToList())).ToList();var np=p.ParagraphProperties?.NumberingProperties;return new(id,p.ParagraphProperties?.ParagraphStyleId?.Val?.Value,np?.NumberingId?.Val?.Value.ToString(),np?.NumberingLevelReference?.Val?.Value,F.Para(p.ParagraphProperties),runs,fields);}
  static IReadOnlyList<FieldModel> Fields(W.Paragraph p,string pid){var result=new List<FieldModel>();int seq=0;var runs=p.Elements<W.Run>().ToList();var active=false;var instr="";var value="";var source=new List<string>();var separated=false;for(int i=0;i<runs.Count;i++){var r=runs[i];var rid=$"{pid}.r{i+1}";foreach(var child in r.ChildElements){if(child is W.FieldChar fc){var t=fc.FieldCharType?.Value;if(t==W.FieldCharValues.Begin){active=true;instr="";value="";source=[];separated=false;}else if(active&&t==W.FieldCharValues.Separate)separated=true;else if(active&&t==W.FieldCharValues.End){result.Add(MakeField($"{pid}.f{++seq}",instr,value,pid,source));active=false;}}else if(active&&child is W.FieldCode code){instr+=code.Text??"";source.Add(rid);}else if(active&&separated&&child is W.Text tx){value+=tx.Text??"";source.Add(rid);}}}
  foreach(var sf in p.Elements<W.SimpleField>()){var ins=sf.Instruction?.Value??"";result.Add(MakeField($"{pid}.f{++seq}",ins,sf.InnerText,pid,[]));}return result;}

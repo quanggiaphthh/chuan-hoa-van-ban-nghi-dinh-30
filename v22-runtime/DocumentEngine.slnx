@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="src/DocumentEngine/DocumentEngine.csproj" />
+  <Project Path="src/DocumentProcessor.Host/DocumentProcessor.Host.csproj" />
   <Project Path="src/SemanticDetector/SemanticDetector.csproj" />
   <Project Path="src/LegalValidator/LegalValidator.csproj" />
   <Project Path="tests/DocumentEngine.Tests/DocumentEngine.Tests.csproj" />
