@@ -4,6 +4,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using Nd30.DocumentEngine.Model;
+using Nd30.DocumentEngine.Package;
 using Nd30.DocumentEngine.Parsing;
 using Nd30.DocumentEngine.Safety;
 using Nd30.LegalValidator.Authorization;

@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Buffers.Binary;
 using System.Text;
+using Nd30.DocumentEngine.Model;
 using Nd30.DocumentEngine.Package;
 using Nd30.DocumentEngine.Safety;
 using Xunit;
