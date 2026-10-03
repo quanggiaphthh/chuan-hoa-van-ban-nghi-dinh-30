@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Http.Features;
 using Nd30.DocumentEngine.Safety;
+using Nd30.LegalValidator.Catalog;
 using Nd30.LegalValidator.Processing;
 
 const string DocxMime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -21,6 +22,11 @@ else if (builder.Environment.IsDevelopment() && configuredUrls.Split(';', String
                   !url.IsLoopback || url.Scheme != Uri.UriSchemeHttp))
     throw new InvalidOperationException("Development processor URLs must bind loopback HTTP only.");
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = maximumBodyBytes);
+// The verified release catalog and the company formatting profile are resolved
+// once at startup so the serving flow runs the real rule engine. A missing pack
+// is a startup failure, never a silently degraded formatter.
+var ruleCatalog = RuleCatalog.LoadVerifiedRelease(ResolveLegalRoot());
+builder.Services.AddSingleton(ruleCatalog);
 builder.Services.AddSingleton<DocumentProcessorService>();
 builder.Services.AddSingleton(new SemaphoreSlim(1, 1));
 
@@ -48,12 +54,36 @@ app.Use(async (context, next) =>
 });
 
 app.MapGet("/health", () => Results.Json(new { status = "ok" }));
-app.MapGet("/capabilities", () => Results.Json(new
+app.MapGet("/capabilities", (DocumentProcessorService processor) => Results.Json(new
 {
     profile = DocumentProcessorService.Profile,
+    profileId = processor.CurrentProfile?.Id,
+    profileVersion = processor.CurrentProfile?.Version,
+    profileDigest = processor.CurrentProfile?.Digest,
+    rulePack = processor.CurrentProfile?.RulePackId,
+    ruleSubsetSize = processor.CurrentProfile?.BaseRuleIds.Count,
+    documentTypes = processor.CurrentProfile?.DocumentTypes.Select(type => new
+    {
+        key = type.TypeKey,
+        labelVi = type.LabelVi,
+        hasTypeHeading = type.HasTypeHeading,
+    }),
+    supportedProperties = processor.CurrentProfile?.MutationTargets.Select(target => new
+    {
+        property = target.Property,
+        scope = target.Scope,
+        unit = target.Unit,
+        labelVi = target.LabelVi,
+        ruleId = target.RuleId,
+    }),
     maximumInputBytes = PackageSafetyLimits.MaximumCompressedInputBytes,
     maximumOutputBytes = DocumentProcessorService.MaximumOutputBytes,
-    operations = new[] { "inspect", "paragraph.alignment.direct" },
+    // Advertise exactly what this build can do: inspect plus the profile-driven apply.
+    // `paragraph.alignment.direct` was the pre-profile spike name and is no longer a
+    // real operation; apply is the single `/apply` route bound to a profile property,
+    // target, profile digest and rule id. Stored execution records keep replaying under
+    // their original logical id, so this metadata change breaks no persisted state.
+    operations = new[] { "inspect", "apply" },
 }));
 
 app.MapPost("/inspect", async (HttpContext context) =>
@@ -68,7 +98,13 @@ app.MapPost("/inspect", async (HttpContext context) =>
     try
     {
         var processor = context.RequestServices.GetRequiredService<DocumentProcessorService>();
-        var result = await processor.InspectAsync(context.Request.Body, context.RequestAborted);
+        // An optional owner-confirmed document type re-scopes the whole inspection:
+        // the rule subset, findings and mutable targets are rebuilt for that type.
+        var confirmedTypeKey = context.Request.Query["confirmedDocumentTypeKey"].ToString();
+        var result = await processor.InspectAsync(
+            context.Request.Body,
+            string.IsNullOrWhiteSpace(confirmedTypeKey) ? null : confirmedTypeKey,
+            context.RequestAborted);
         return Results.Json(result);
     }
     catch (DocumentProcessorException error)
@@ -97,11 +133,32 @@ app.MapPost("/apply", async (HttpContext context) =>
     var paragraphId = query["paragraphId"].ToString();
     var expectedBefore = query["expectedBefore"].ToString();
     var desiredAfter = query["desiredAfter"].ToString();
+    var profileDigest = query["profileDigest"].ToString();
+    var profileId = query["profileId"].ToString();
+    var ruleId = query["ruleId"].ToString();
+    // Profile-driven formatting apply. `property` selects the profile target;
+    // `targetId` names the paragraph or section it belongs to.
+    var property = query["property"].ToString();
+    var targetId = query["targetId"].ToString();
+    var documentTypeKey = query["documentTypeKey"].ToString();
+    var isProfileApply = property.Length > 0;
+
+    // The inspection binding is mandatory on the profile path: an apply that cannot
+    // name the profile and the exact current value it was confirmed against is
+    // refused before any work starts.
     if (sourceSha256.Length != 64 || sourceSha256.Any(character => !Uri.IsHexDigit(character)) ||
-        paragraphId.Length is < 2 or > 10 || paragraphId[0] != 'p' || !int.TryParse(paragraphId.AsSpan(1), out var paragraphNumber) || paragraphNumber < 1 ||
-        !new[] { "LEFT", "CENTER", "RIGHT", "JUSTIFY" }.Contains(expectedBefore, StringComparer.Ordinal) ||
-        !new[] { "LEFT", "CENTER", "RIGHT", "JUSTIFY" }.Contains(desiredAfter, StringComparer.Ordinal))
-        return await WriteError(context, StatusCodes.Status400BadRequest, "INVALID_INPUT", "The confirmed alignment request is invalid.", correlationId);
+        (isProfileApply
+            ? (profileDigest.Length != 64 || profileDigest.Any(character => !Uri.IsHexDigit(character))
+                || documentTypeKey.Length is 0 or > 32
+                || expectedBefore.Length is 0 or > 64
+                || property.Length is 0 or > 128
+                || targetId.Length is 0 or > 128
+                || desiredAfter.Length is 0 or > 64)
+            : (paragraphId.Length is < 2 or > 10 || paragraphId[0] != 'p' || !int.TryParse(paragraphId.AsSpan(1), out _)
+                || expectedBefore.Length == 0
+                || profileDigest.Length > 0 && (profileDigest.Length != 64 || profileDigest.Any(character => !Uri.IsHexDigit(character)))
+                || desiredAfter.Length is 0 or > 64)))
+        return await WriteError(context, StatusCodes.Status400BadRequest, "INVALID_INPUT", "The confirmed document operation is invalid.", correlationId);
 
     var gate = context.RequestServices.GetRequiredService<SemaphoreSlim>();
     if (!await gate.WaitAsync(0, context.RequestAborted))
@@ -109,8 +166,40 @@ app.MapPost("/apply", async (HttpContext context) =>
     try
     {
         var processor = context.RequestServices.GetRequiredService<DocumentProcessorService>();
+        if (isProfileApply)
+        {
+            var formatted = await processor.ApplyFormattingAsync(context.Request.Body, new FormattingApplyRequest(
+                sourceSha256.ToLowerInvariant(), documentTypeKey, property, targetId, expectedBefore, desiredAfter,
+                profileId.Length > 0 ? profileId : null,
+                profileDigest.Length > 0 ? profileDigest.ToLowerInvariant() : null,
+                ruleId.Length > 0 ? ruleId : null), context.RequestAborted);
+
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            context.Response.ContentType = DocxMime;
+            context.Response.ContentLength = formatted.OutputBytes.Length;
+            context.Response.Headers["Content-Disposition"] = "attachment; filename=\"formatted.docx\"";
+            context.Response.Headers["X-Output-SHA256"] = formatted.OutputSha256;
+            context.Response.Headers["X-Document-Reopened"] = "true";
+            context.Response.Headers["X-Document-Revalidated"] = "true";
+            context.Response.Headers["X-Applied-Property"] = formatted.Property;
+            context.Response.Headers["X-Applied-Target"] = formatted.TargetId;
+            context.Response.Headers["X-Applied-Rule-Id"] = formatted.RuleId;
+            context.Response.Headers["X-Applied-Document-Type"] = formatted.DocumentTypeKey;
+            if (formatted.Binding.Digest.Length > 0) context.Response.Headers["X-Profile-Digest"] = formatted.Binding.Digest;
+            if (formatted.Binding.Version.Length > 0) context.Response.Headers["X-Profile-Version"] = formatted.Binding.Version;
+            await context.Response.Body.WriteAsync(formatted.OutputBytes, context.RequestAborted);
+            return Results.Empty;
+        }
+
+        if (!new[] { "LEFT", "CENTER", "RIGHT", "JUSTIFY" }.Contains(expectedBefore, StringComparer.Ordinal) ||
+            !new[] { "LEFT", "CENTER", "RIGHT", "JUSTIFY" }.Contains(desiredAfter, StringComparer.Ordinal))
+            return await WriteError(context, StatusCodes.Status400BadRequest, "INVALID_INPUT", "The confirmed alignment request is invalid.", correlationId);
+
         var result = await processor.ApplyAlignmentAsync(context.Request.Body, sourceSha256, paragraphId,
-            expectedBefore, desiredAfter, context.RequestAborted);
+            expectedBefore, desiredAfter, context.RequestAborted,
+            profileDigest.Length > 0 ? profileDigest : null,
+            profileId.Length > 0 ? profileId : null,
+            ruleId.Length > 0 ? ruleId : null);
         context.Response.StatusCode = StatusCodes.Status200OK;
         context.Response.ContentType = DocxMime;
         context.Response.ContentLength = result.OutputBytes.Length;
@@ -118,6 +207,9 @@ app.MapPost("/apply", async (HttpContext context) =>
         context.Response.Headers["X-Output-SHA256"] = result.OutputSha256;
         context.Response.Headers["X-Document-Reopened"] = "true";
         context.Response.Headers["X-Document-Revalidated"] = "true";
+        context.Response.Headers["X-Applied-Rule-Id"] = result.RuleId;
+        if (result.ProfileDigest.Length > 0) context.Response.Headers["X-Profile-Digest"] = result.ProfileDigest;
+        if (result.ProfileVersion.Length > 0) context.Response.Headers["X-Profile-Version"] = result.ProfileVersion;
         await context.Response.Body.WriteAsync(result.OutputBytes, context.RequestAborted);
         return Results.Empty;
     }
@@ -145,6 +237,28 @@ static bool HasValidBearer(string authorization, string expectedToken)
     var candidate = Encoding.UTF8.GetBytes(authorization[prefix.Length..].Trim());
     var expected = Encoding.UTF8.GetBytes(expectedToken);
     return CryptographicOperations.FixedTimeEquals(SHA256.HashData(candidate), SHA256.HashData(expected));
+}
+
+/// <summary>
+/// Locate the verified release pack. An explicit override wins; otherwise walk
+/// up from the binary until the pack is found, which covers both a source run and
+/// a published layout.
+/// </summary>
+static string ResolveLegalRoot()
+{
+    var configured = Environment.GetEnvironmentVariable("DOCUMENT_PROCESSOR_LEGAL_ROOT");
+    if (!string.IsNullOrWhiteSpace(configured))
+    {
+        if (File.Exists(Path.Combine(configured, "release", "admin-nd30-verified-rc-v20.yaml"))) return configured;
+        throw new InvalidOperationException("DOCUMENT_PROCESSOR_LEGAL_ROOT does not contain the verified release pack.");
+    }
+    var directory = new DirectoryInfo(AppContext.BaseDirectory);
+    while (directory is not null)
+    {
+        if (File.Exists(Path.Combine(directory.FullName, "release", "admin-nd30-verified-rc-v20.yaml"))) return directory.FullName;
+        directory = directory.Parent;
+    }
+    throw new InvalidOperationException("Verified release pack not found from the processor base directory.");
 }
 
 static bool HasDocxContentType(string? contentType) =>

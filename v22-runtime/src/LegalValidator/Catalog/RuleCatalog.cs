@@ -14,6 +14,14 @@ public sealed class RuleCatalog
         ReleaseRuleIds = releaseRuleIds;
     }
 
+    /// <summary>
+    /// Build a catalog over an explicit rule set, keeping the release membership
+    /// of an existing verified catalog. Used to prove that content-level changes
+    /// (not just ID changes) are reflected in a profile binding.
+    /// </summary>
+    internal static RuleCatalog WithRules(RuleCatalog source, IReadOnlyList<RuleDefinition> rules) =>
+        new(rules, source.ReleaseRuleIds);
+
     public static RuleCatalog LoadVerifiedRelease(string root)
     {
         var releasePath = Path.Combine(root, "release", "admin-nd30-verified-rc-v20.yaml");
