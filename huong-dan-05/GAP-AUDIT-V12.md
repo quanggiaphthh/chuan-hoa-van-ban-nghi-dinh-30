@@ -25,69 +25,14 @@
 
 **Phân biệt:** `implementation_status: core` trong Source Registry là metadata hiện có, **không phải** chứng nhận rule HD05 đã được chạy/verified.
 
-## 3. Ánh xạ 29 nhóm tham chiếu của V12
+## 3. Ma trận 29 nhóm tham chiếu V12 — kết luận kiểm toán về validation và quyền tự sửa
 
-Mã `R01–R29` là mã tài liệu V12, **không phải canonical ID**. Cột trạng thái phản ánh *khả năng tận dụng hợp đồng thiết kế*, không có nghĩa rule hoặc DOCX engine đã PASS.
+Mã `R01–R29` chỉ là mã tham chiếu của đặc tả V12, không phải canonical ID. **Ma trận sau đây là nguồn kết luận kiểm toán duy nhất của 29 nhóm**, thay thế bảng gộp `EXTEND/BLOCKED` của lần audit đầu.
 
-| V12 | Trường/ý định kiểm tra | Reuse contract | Trạng thái trước triển khai |
-|---|---|---|---|
-| R01 | Cỡ chữ tiêu đề Đảng | Document Model + Rule Model | EXTEND / MISSING verified rule |
-| R02 | Đường kẻ liền dưới tiêu đề | Structural + rendering evidence | BLOCKED: chưa có layout evidence |
-| R03 | Dấu sao dưới cơ quan | Semantic roles + OOXML | EXTEND / MISSING verified rule |
-| R04 | Số văn bản có chữ số 0 dẫn đầu | Context + numbering | BLOCKED: không thay sổ văn thư |
-| R05 | Ký hiệu, dấu gạch trong số/ký hiệu | Context + parser metadata | BLOCKED: không sửa số đã cấp |
-| R06 | Ngày dưới 10 | Context + temporal resolver | BLOCKED: không đổi ngày nghiệp vụ |
-| R07 | Tháng dưới 3 | Context + temporal resolver | BLOCKED: phải đối chiếu ngày ban hành |
-| R08 | Tên loại cỡ 15–16 pt | Effective formatting | EXTEND / MISSING verified rule |
-| R09 | Trích yếu loại thường cỡ 14–15 pt | Effective formatting | EXTEND / MISSING verified rule |
-| R10 | Trích yếu công văn 12 pt nghiêng | Document type + effective formatting | EXTEND / MISSING verified rule |
-| R11 | Năm dấu gạch sau trích yếu | Metadata/boundary | EXTEND; không tự thêm cho công văn |
-| R12 | Nội dung 14–15 pt | Body ownership + effective formatting | EXTEND / MISSING verified rule |
-| R13 | Căn đều hai lề | Effective paragraph properties | EXTEND / MISSING verified rule |
-| R14 | Thụt đầu dòng | Effective paragraph properties | EXTEND / MISSING verified rule |
-| R15 | Khoảng cách đoạn | Effective paragraph properties | EXTEND / MISSING verified rule |
-| R16 | Line spacing Exactly 18–22 pt | OOXML line mode + effective value | EXTEND / MISSING verified rule |
-| R17 | Dấu mở đầu/kết thúc căn cứ | Body semantics | BLOCKED: review nội dung |
-| R18 | Kính gửi công văn / Kính trình tờ trình | Type + position + semantic role | EXTEND; cần field ownership evidence |
-| R19 | Nơi nhận và danh sách nơi nhận | Two distinct semantic fields | EXTEND; tách nguyên tử khi import |
-| R20 | Số lượng và tiêu đề phụ lục | `sections[]` + `appendices[]` | EXTEND; chưa chứng minh round-trip |
-| R21 | A4/A5 hoặc mẫu in có điều kiện | Applicability + section model | EXTEND / MISSING verified rule |
-| R22 | 4 lề trang dọc | Section-aware properties | EXTEND; tách 4 atomic rules |
-| R23 | Lề mặt sau giấy in hai mặt | Section + duplex intent | BLOCKED: không suy từ DOCX đơn lẻ |
-| R24 | Số trang/định vị/ẩn trang đầu | Headers/footers/fields | BLOCKED: cần field+render evidence |
-| R25 | Số trang phụ lục độc lập | Section/appendix numbering | BLOCKED: cần round-trip evidence |
-| R26 | Dấu bản sao 80×50 mm | Copy evidence | BLOCKED: không xác nhận vật mang tin bằng OOXML |
-| R27 | Màu đỏ, kiểu và cỡ chữ dấu bản sao | Copy evidence | BLOCKED: mực thật cần kiểm ngoài DOCX |
-| R28 | Ký hiệu BS/sổ cấp số bản sao | Applicability + external registry | BLOCKED: không tự cấp số |
-| R29 | Hai chữ ký số bản sao điện tử | Signed/protected safety contract | BLOCKED: thiếu chứng minh PKI |
-
-## 4. Mốc nghiệm thu và giới hạn
-
-- Nguồn pháp lý ở Phụ lục không tương đương engine coverage; trước khi thêm canonical rule phải có source locator, applicability theo thời gian và type, tính nguyên tử, luật chặn auto-fix.
-- Không đổi `source registry`, `rule-pack`, `schemas`, `v22-runtime`, tests đã PASS trong PR tài liệu này.
-- Tái sử dụng 88 tình huống QA trong V12: `T01–T30` (30), `TEST-G31–TEST-G46` (16), `G47–G88` (42). **Chưa chạy** 88 tình huống và không tuyên bố PASS.
-- Các thay đổi rule/runtime tương lai chỉ nên mở trong PR khác khi có danh sách canonical IDs, fixture DOCX và báo cáo round-trip vùng ảnh hưởng; không đụng Locked Core nếu extension contract đủ.
-
-## 5. Các việc vẫn mở
-
-1. Xác nhận trạng thái hiệu lực và quan hệ alias của các công văn bị thay thế/bãi bỏ, đặc biệt Công văn 5053.
-2. Đối chiếu giá trị quy phạm theo từng rule nguyên tử và gắn `source_locator` với phụ lục/trang tương ứng.
-3. Kiểm tra actual runtime capability cho text/border/section/field/shape/footnote/AlternateContent, chữ ký số và trạng thái tài liệu.
-4. Xác minh mapping 88 QA với fixtures đã có; chỉ tạo fixture mới nếu thiếu hành vi quan sát được.
-5. Chỉ xem xét auto-fix sau khi có bằng chứng `FIX_VERIFIED` và phê duyệt người dùng.
-
----
-
-**Kết quả kiểm toán hiện tại:** chỉ đủ căn cứ cập nhật **tài liệu nghiên cứu và ma trận khoảng trống**. Chưa đủ căn cứ tự động bổ sung `verified` canonical rules hoặc kích hoạt rule pack tại runtime.
-
-## 6. Thẩm định bổ sung — tách kiểm tra lỗi khỏi quyền tự sửa (17/10/2026)
-
-**Phân xử hiện hành:** Ma trận §3 bên trên thể hiện *khoảng trống tích hợp ở thời điểm audit*, không được đọc các nhãn `BLOCKED` như kết luận rằng quy định không thể kiểm tra. Riêng cột "trạng thái trước triển khai" có thể đồng thời trộn giới hạn validator, giới hạn tự sửa và yêu cầu dữ liệu văn thư. Bảng dưới đây là **bản phân xử chính thức cho hai trục độc lập**; khi có khác nhau, áp bảng §6.
-
-- `CONDITIONAL`: phép kiểm **có thể thiết kế** với dữ liệu, evidence và capability nêu rõ, nhưng chưa xác nhận hệ thống hiện hành đã thực hiện.
-- `REVIEW`: cần thẩm định nội dung/định danh/nguồn bên ngoài; không đưa ra `PASS` chỉ từ DOCX.
-- `NOT_EVALUATED`: chưa có capability hoặc chứng cứ cần thiết; không được dùng làm `PASS`.
-- `OFF`: không mở auto-fix trong PR này. `CANDIDATE_GUARDED` chỉ là phương án có thể xem xét sau này, **không phải** cấp phép sửa.
+- `CONDITIONAL`: có thể thiết kế phép kiểm với bằng chứng và capability nêu rõ; **chưa chứng minh runtime đã hoạt động**.
+- `REVIEW`: cần xác nhận nội dung/nghiệp vụ hoặc nguồn độc lập, không suy `PASS` từ DOCX.
+- `NOT_EVALUATED`/`NEEDS_REVIEW`: trạng thái hợp lệ nếu thiếu capability hoặc chứng cứ.
+- `OFF`: PR này không bật auto-fix. `CANDIDATE_GUARDED` là đề xuất đánh giá ở giai đoạn sau, **không phải** policy đã được phê duyệt hoặc schema enum.
 
 | ID | Nguồn chính (Hướng dẫn 05) | Khả năng validation (có điều kiện) | Chứng cứ tối thiểu | Quyền auto-fix (hiện tại) |
 |---|---|---|---|---|
@@ -121,7 +66,30 @@ Mã `R01–R29` là mã tài liệu V12, **không phải canonical ID**. Cột t
 | R28 | PL3 §1.2 | REVIEW: `BS`, số từ 01 chung các hình thức sao/nhiệm kỳ | Sổ sao và cơ quan sao; chuỗi `BS` có thể check hình thức | PROHIBITED tự cấp hoặc đổi số |
 | R29 | II.III.3.1–3.4; PL1 ô 14–15 | REVIEW: chữ ký số đúng vị trí và hợp lệ | PKI/certificate, signature container, chain/status; không chỉ icon | PROHIBITED sửa bản đã ký |
 
-**Phân biệt hai khái niệm:** Dấu bản sao giấy (R26–R28) khác dấu sao ký tự `*` dưới tên cơ quan (R03); không dùng cùng parser role.
+**Phân biệt:** Dấu bản sao giấy ở R26–R28 khác ký tự dấu sao `*` dưới tên cơ quan tại R03; phải có semantic role khác nhau. Các nhóm R18, R19, R22, R24, R27 phải tách thành rule nguyên tử và exact-dedup trước khi đưa vào registry.
+
+## 4. Mốc nghiệm thu và giới hạn
+
+- Nguồn pháp lý ở Phụ lục không tương đương engine coverage; trước khi thêm canonical rule phải có source locator, applicability theo thời gian và type, tính nguyên tử, luật chặn auto-fix.
+- Không đổi `source registry`, `rule-pack`, `schemas`, `v22-runtime`, tests đã PASS trong PR tài liệu này.
+- Tái sử dụng 88 tình huống QA trong V12: `T01–T30` (30), `TEST-G31–TEST-G46` (16), `G47–G88` (42). **Chưa chạy** 88 tình huống và không tuyên bố PASS.
+- Các thay đổi rule/runtime tương lai chỉ nên mở trong PR khác khi có danh sách canonical IDs, fixture DOCX và báo cáo round-trip vùng ảnh hưởng; không đụng Locked Core nếu extension contract đủ.
+
+## 5. Các việc vẫn mở
+
+1. Xác nhận trạng thái hiệu lực và quan hệ alias của các công văn bị thay thế/bãi bỏ, đặc biệt Công văn 5053.
+2. Đối chiếu giá trị quy phạm theo từng rule nguyên tử và gắn `source_locator` với phụ lục/trang tương ứng.
+3. Kiểm tra actual runtime capability cho text/border/section/field/shape/footnote/AlternateContent, chữ ký số và trạng thái tài liệu.
+4. Xác minh mapping 88 QA với fixtures đã có; chỉ tạo fixture mới nếu thiếu hành vi quan sát được.
+5. Chỉ xem xét auto-fix sau khi có bằng chứng `FIX_VERIFIED` và phê duyệt người dùng.
+
+---
+
+**Kết quả kiểm toán hiện tại:** chỉ đủ căn cứ cập nhật **tài liệu nghiên cứu và ma trận khoảng trống**. Chưa đủ căn cứ tự động bổ sung `verified` canonical rules hoặc kích hoạt rule pack tại runtime.
+
+## 6. Kết quả kiểm toán bổ sung ngày 17/10/2026
+
+Kết luận về hai trục `validation` và `auto-fix` đã được **hợp nhất vào bảng duy nhất ở §3**; không duy trì ma trận trạng thái song song.
 
 ### 6.1. Kết quả kiểm toán canonical rules — không suy diễn từ metadata
 
