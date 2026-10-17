@@ -1,6 +1,11 @@
 name: HD05 P0-C ordered body verification
 
 on:
+  pull_request:
+    paths:
+      - 'v22-runtime/src/DocumentEngine/**'
+      - 'v22-runtime/tests/DocumentEngine.Tests/**'
+      - '.github/workflows/hd05-p0c-ordered-block-verification.yml'
   push:
     branches:
       - feature/hd05-p0c-ordered-block-provenance
