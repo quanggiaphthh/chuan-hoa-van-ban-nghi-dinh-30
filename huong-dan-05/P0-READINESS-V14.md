@@ -74,7 +74,7 @@ Căn cứ kỹ thuật chính thức: [Microsoft Learn — Structure of a Wordpr
 | Mixed formatting: adapter chọn run đầu có thể tìm | `SemanticValidationContextBuilder.AddFormatting()` | **P1**: không kết luận toàn trường từ run đầu; thử multi-run, inheritance, override trước |
 | `DocumentProcessorService.Profile` | `generic-direct-alignment-spike` | Không coi formatter NĐ30 hoặc HD05 production; chỉ reuse giới hạn |
 | `RuleEvaluator.Evaluate()` | `NOT_EVALUATED` nếu thiếu runtime capability | REUSE, không thay bằng AI |
-| Baseline test fixtures | `v22-runtime/fixtures/docx/`, `fixtures/v23/` | Có sẵn 23 fixture DOCX v22 và 11 fixture v23; ưu tiên reuse và bổ sung tối thiểu loại Party/interleaving |
+| Baseline test fixtures | `v22-runtime/fixtures/docx/`, `fixtures/v23/` | Có sẵn 22 fixture DOCX + 1 fixture DOCM ở v22, và 11 fixture DOCX ở v23; ưu tiên reuse và bổ sung tối thiểu loại Party/interleaving |
 | CI workflows v22/v23/v24 | trigger chủ yếu `workflow_dispatch` và `push` ở feature branches cố định | **Không chứng minh CI tự chạy cho Draft PR #10**; code PR tương lai phải có gate tương ứng hoặc chạy lệnh thực tế |
 | Môi trường audit hiện tại | không có dotnet SDK; không clone được repo từ internet trong local container | Chưa chạy `.NET` build/test; không được gọi `PASS` |
 
