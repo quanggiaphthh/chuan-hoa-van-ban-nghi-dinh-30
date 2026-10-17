@@ -1,0 +1,114 @@
+# P0 READINESS V14 — Ba điểm nghẽn trước triển khai Hướng dẫn 05
+
+**Ngày kiểm toán:** 17/10/2026  
+**Repository:** `quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30`  
+**Baseline:** `078dae21f9e23975676179fa189f5c01b605f49a`  
+**PR tài liệu:** #10 (`docs/hd05-v12-audit-20261017`)  
+**Quyết định:** `DOCS_GO / CODE_NO_GO / AUTO_FIX_NO_GO`.
+
+## 1. Mục tiêu và nguồn bằng chứng
+
+Hoàn tất research-before-build để xác định cách **tái sử dụng tối đa** parser/semantic detector/rule evaluator sẵn có, nhằm chuẩn bị tích hợp Hướng dẫn 05-HD/VPTW mà **không phá vỡ Nghị định 30**.
+
+Căn cứ nghiệp vụ: [Hướng dẫn 05-HD/VPTW (PDF chính thức, 36 trang)](https://tulieuvankien.dangcongsan.vn/upload/2006988/20260529/HD_05_VPTW_e1550.pdf), [Quy định 399-QĐ/TW](https://xaydungchinhsach.chinhphu.vn/quy-dinh-so-399-qd-tw-cua-ban-bi-thu-ve-the-loai-tham-quyen-ban-hanh-va-the-thuc-van-ban-cua-dang-119260119124508363.htm).
+
+Căn cứ kỹ thuật chính thức: [Microsoft Learn — Structure of a WordprocessingML document](https://learn.microsoft.com/en-us/office/open-xml/word/structure-of-a-wordprocessingml-document), [Microsoft Learn — Open XML SDK](https://learn.microsoft.com/en-us/office/open-xml/about-the-open-xml-sdk). Theo cấu trúc WordprocessingML, `w:body` là container cho các block-level element (`w:p`, `w:tbl`, ...), vì vậy thứ tự gốc phải được quan sát theo chuỗi child elements trong XML thay vì ghép hai tập riêng.
+
+Đối tượng chưa nằm trong phạm vi PR: thay code, tạo rule `verified`, thay behavior UI/host, migration, chỉnh DOCX đã ký, commit lên `main`.
+
+## 2. P0-A — Chọn bộ quy tắc theo regime và bản release
+
+| Câu hỏi | Bằng chứng đã đọc |
+|---|---|
+| Đã có RuleCatalog và RuleEvaluator chưa? | Có, `v22-runtime/src/LegalValidator/Catalog/RuleCatalog.cs` và `Evaluation/RuleEvaluator.cs` |
+| Loader hỗ trợ lựa chọn Party manifest chưa? | Chưa thấy. `LoadVerifiedRelease(root)` hiện gắn cứng `release/admin-nd30-verified-rc-v20.yaml` |
+| Release hiện hành chứa gì? | `v22-runtime/release/admin-nd30-verified-rc-v20.yaml`: 435 ID, tất cả bắt đầu `ND30.` và `regime: administrative` |
+| Source Registry/Party rule pack đủ chứng minh chạy được chưa? | Chưa. `sources/registry.yaml` + `rule-packs/party-document-format-2026.yaml` chỉ đăng ký nguồn/selectors, không đồng nhất với verified runtime manifest |
+
+**Reuse-first integration (chưa triển khai):** duy trì `RuleCatalog` là authority duy nhất. Khi đã có ít nhất một canonical rule Party được phê duyệt, mở *đường chọn manifest an toàn* ở boundary loader thay vì tạo rule engine mới. Cơ chế đang nạp ND30 **phải giữ nguyên mặc định**; Party/unknown không được lặng lẽ fallback sang ND30.
+
+**Điều kiện triển khai:** (a) có manifest Party độc lập chứa chỉ ID đã verified; (b) explicit regime + issuer + issue date + source locator; (c) validator từ chối rule không đúng regime hoặc thiếu capability; (d) signature/authority/safety vẫn giữ behavior cũ; (e) không nạp 435 rule ND30 cho Party theo mặc định.
+
+**Test tối thiểu có ý nghĩa**: ND30 default nạp đúng 435 ID không đổi; Party không có manifest báo không khả dụng, không PASS giả; Party có manifest chưa verified phải bị từ chối; unknown regime không auto-fix; temporal resolver xử lý 09/01/2026 và 27/05/2026 độc lập.
+
+**Tệp có thể ảnh hưởng (không sửa trong PR #10):** `RuleCatalog.cs`, phần adapter regime/loader thực sự được dùng, manifest Party verified **chỉ sau khi nguồn/rule được kiểm chứng**, `LegalValidator.Tests`.
+
+## 3. P0-B — Nhận diện ngữ nghĩa cho văn bản của Đảng
+
+| Khả năng hiện có | Kết luận |
+|---|---|
+| `AdministrativeSemanticDetector.Detect(DocumentModel)` | **REUSE** source-evidence, classification confidence, ambiguity và deterministic regex primitives |
+| `NationalHeaderTexts` | Chỉ `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM`; không được thay bằng tiêu đề Đảng trên cùng đường mặc định |
+| `MottoTexts` | Chỉ `ĐỘC LẬP - TỰ DO - HẠNH PHÚC` |
+| `SemanticRole` | Có nhiều role hữu dụng (issuer, number, recipient, appendix, copy), chưa có dedicated `PartyHeading` |
+| `AdministrativeDocumentClass` | Các class: OfficialLetter, NamedAdministrativeDocument, Appendix, Copy, Unknown; **chưa đủ** phân loại 25 thể loại + 8 giấy tờ Đảng |
+
+**Thiết kế tối thiểu:** xác định regime trước semantic detection. Giữ bộ detector hành chính không đổi; ưu tiên composition từ `DocumentModel`, `SemanticComponentCandidate`, `SemanticSourceEvidence` để tạo Party-specific profile/adapter. **Không gắn nhãn quốc hiệu hành chính cho tiêu đề Đảng** và không nhồi 25+8 thành enum hành chính. Chỉ mở rộng contract nếu tìm thấy thiếu hụt được tái hiện bằng fixture. Gán `front/body/end/appendices[]` là phân vùng kỹ thuật, không phải điều khoản quy định.
+
+**Test trực tiếp:** (i) tiêu đề ĐẢNG CỘNG SẢN VIỆT NAM ở đầu; (ii) mẫu công văn có `Kính gửi` tại 5a; (iii) mẫu tờ trình có `Kính trình` theo 9b; (iv) Nơi nhận cuối; (v) ký nhận nhiều người; (vi) appendix; (vii) biên bản; (viii) ảnh/chữ ký/con dấu là object chưa chắc chắn → review; (ix) negative ND30 vẫn phân loại như trước.
+
+**Tệp tham chiếu:** `v22-runtime/src/SemanticDetector/Detection/AdministrativeSemanticDetector.cs`, `Model/SemanticModels.cs`, `src/LegalValidator/Adapters/SemanticValidationContextBuilder.cs`, `tests/SemanticDetector.Tests/SemanticDetectorTests.cs`. Tránh sửa detector hiện có nếu adapter có thể composition.
+
+## 4. P0-C — Bảo toàn thứ tự xen kẽ đoạn–bảng và provenance
+
+**Phát hiện có thể tái hiện từ source:**
+
+- `DocxParser.Parse()` duyệt `body.Elements<W.Paragraph>()` và nạp `Paragraphs` **trước**, rồi `body.Elements<W.Table>()` thành `Tables`. Đây không phải thứ tự `w:p/w:tbl` xen kẽ.
+- `DocumentModel` ghi `Paragraphs` và `Tables` là hai collections riêng, không có thứ tự block thống nhất/anchor rõ ràng.
+- `AdministrativeSemanticDetector.Flatten()` duyệt các bảng trước rồi mới đến `d.Paragraphs`; `SemanticSourceEvidence.Order` theo thứ tự flatten đó, **không chứng minh thứ tự nguồn XML**.
+- Hàm `P(W.Paragraph)` lấy `p.Elements<W.Run>()` trực tiếp, không tự chứng minh bảo toàn text nằm trong tracked changes/SDT/textbox/nested objects. `T(W.Table)` đọc paragraph trực tiếp của mỗi cell; không tự chứng minh nested tables.
+- `PackagePreserver.PartSha256Inventory()` là primitive hữu ích để so trước/sau, **không tự khắc phục mất thứ tự semantic**.
+
+**Khuyến nghị thiết kế tối thiểu:** tái sử dụng chính SDK `DocumentFormat.OpenXml` đã có, đi theo `body.ChildElements` trong đúng thứ tự nguồn, sinh ánh xạ `ordered-block-ref {source-part, source-path/id, order, kind}`. Không cần thư viện mới. Nếu block không biểu diễn đầy đủ (textbox, nested table, SDT, `AlternateContent`, drawing, field...) phải giữ unclassified/provenance và ngăn structural auto-fix.
+
+**Kiểm tra bắt buộc:** fixture chứa thứ tự `p1, tbl1, p2, tbl2, p3`; yêu cầu 5 block duy nhất, đúng thứ tự. Fixture khác có `p1, table(cell paragraph), p2`; không nhân đôi cell paragraph như top-level block. Kiểm tra appendix sau bảng; header/footer không bị nhầm top-level body; `AlternateContent` không mất hoặc bị tự chọn nhầm một nhánh. Sau đó copy/round-trip, reopen, đối chiếu part inventory, rels, table/cell count, image refs và mọi phần ngoài phạm vi sửa.
+
+**Điểm tương thích:** giữ các public properties cũ `Paragraphs`/`Tables` nếu các consumer/tests hiện có phụ thuộc; metadata order nên là extension/additive contract đã xác minh. Không sửa `PackagePreserver` nếu không chứng minh lỗi.
+
+**Tệp ảnh hưởng dự kiến:** `src/DocumentEngine/Parsing/DocxParser.cs`, `Model/Models.cs`, `src/SemanticDetector/Detection/AdministrativeSemanticDetector.cs` hoặc source-order adapter, và test có ảnh hưởng trực tiếp.
+
+## 5. Nút chặn bổ sung được xác định trong lúc audit
+
+| Vấn đề | Tệp / symbol | Quyết định |
+|---|---|---|
+| Mixed formatting: adapter chọn run đầu có thể tìm | `SemanticValidationContextBuilder.AddFormatting()` | **P1**: không kết luận toàn trường từ run đầu; thử multi-run, inheritance, override trước |
+| `DocumentProcessorService.Profile` | `generic-direct-alignment-spike` | Không coi formatter NĐ30 hoặc HD05 production; chỉ reuse giới hạn |
+| `RuleEvaluator.Evaluate()` | `NOT_EVALUATED` nếu thiếu runtime capability | REUSE, không thay bằng AI |
+| Baseline test fixtures | `v22-runtime/fixtures/docx/`, `fixtures/v23/` | Có sẵn 23 fixture DOCX v22 và 11 fixture v23; ưu tiên reuse và bổ sung tối thiểu loại Party/interleaving |
+| CI workflows v22/v23/v24 | trigger chủ yếu `workflow_dispatch` và `push` ở feature branches cố định | **Không chứng minh CI tự chạy cho Draft PR #10**; code PR tương lai phải có gate tương ứng hoặc chạy lệnh thực tế |
+| Môi trường audit hiện tại | không có dotnet SDK; không clone được repo từ internet trong local container | Chưa chạy `.NET` build/test; không được gọi `PASS` |
+
+## 6. Trình tự thay đổi nhỏ nhất khi được phê duyệt code
+
+1. **P0-C trước:** chứng minh block order + provenance mà không đụng behavior xử lý NĐ30 hiện có. Test đúng phạm vi parser/semantic evidence.
+2. **P0-B tiếp:** Party regime + detector adapter (không thay administrative default), test Party positive + ND30 negative.
+3. **P0-A cuối:** chỉ khi có canonical Party rule được thẩm định và manifest hợp lệ mới mở rộng tùy chọn nạp cùng `RuleCatalog`; không tạo release pack giả/empty `verified`.
+4. **P1 formatting:** dựa trên `EffectiveFormattingResolver` hiện có, giải quyết mixed-runs và layout gates; `NOT_EVALUATED` khi thiếu capability.
+5. **HD05 apply:** chỉ sau review source/time/authority, cục bộ bằng chứng patch; `signed/protected/secret/unsupported` fail-closed.
+
+**Test hướng dẫn (chưa chạy):**
+```bash
+cd v22-runtime
+dotnet restore DocumentEngine.slnx
+dotnet build DocumentEngine.slnx --no-restore -c Release
+dotnet test tests/DocumentEngine.Tests/DocumentEngine.Tests.csproj --no-build -c Release
+dotnet test tests/SemanticDetector.Tests/SemanticDetector.Tests.csproj --no-build -c Release
+dotnet test tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release
+```
+
+Phạm vi xác minh mở rộng chỉ khi code thực tế ảnh hưởng contracts đang LOCKED. **Không thực hiện build/test giả lập hay ghi nhận PASS khi không có log máy chạy.**
+
+## 7. Checklist nghiệm thu và trạng thái
+
+| Gate | Điều kiện nghiệm thu | Trạng thái |
+|---|---|---|
+| Evidence audit | Source + exact symbol + logic dẫn tới kết luận | **PASS (static)** |
+| Reuse before build | Phân biệt reuse native SDK / extension / code tối thiểu | **PASS (design)** |
+| Parser preserves mixed order | Fixture có xen kẽ đoạn/bảng được chứng minh qua code + output | **NOT_TESTED / NO-GO** |
+| Party detector independent routing | Party positive và ND30 negative tests chạy thực tế | **NOT_TESTED / NO-GO** |
+| Party release loader | Release manifest verified + loader routing test | **BLOCKED** (chưa có verified Party rules) |
+| Signed/unsupported safety | Không mutate và không báo PASS giả | **REQUIRES_RUNTIME_EVIDENCE** |
+| 88 QA HD05 | Mapping sang fixture hiện có; test ảnh hưởng cần PASS | **SPECIFIED_ONLY** |
+| Deploy / merge main | Có approval riêng và evidence | **NOT_AUTHORIZED** |
+
+**Hành động trong vòng này:** chỉ bổ sung file Markdown vào **Draft PR #10**, không sửa code/CI/release pack, không merge/commit `main`, không bật HD05 auto-fix.
