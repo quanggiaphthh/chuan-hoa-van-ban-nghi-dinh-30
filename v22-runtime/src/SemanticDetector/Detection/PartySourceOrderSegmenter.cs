@@ -65,6 +65,12 @@ public sealed class PartySourceOrderSegmenter
 
         if (!validOrder)
             return Unresolved("NO_STRUCTURAL_CLASSIFICATION_WITH_INVALID_ORDER");
+        // Each direct source child may be owned once only, even when supplied by
+        // a future adapter rather than the canonical DocxParser.
+        var ids = blocks.Where(b => b.ModelId is not null).Select(b => b.ModelId!).ToArray();
+        if (ids.Distinct(StringComparer.Ordinal).Count() != ids.Length
+            || blocks.Select(b => b.SourcePath).Distinct(StringComparer.Ordinal).Count() != blocks.Count)
+            return Unresolved("DUPLICATE_BODY_BLOCK_PROVENANCE");
         if (blocks.Any(b => b.Kind == "paragraph"
                 && (b.ModelId is null || !paragraphs.ContainsKey(b.ModelId))))
             return Unresolved("UNRESOLVED_PARAGRAPH_REFERENCE");
