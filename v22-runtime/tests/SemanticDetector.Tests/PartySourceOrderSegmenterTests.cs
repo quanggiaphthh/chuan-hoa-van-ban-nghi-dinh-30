@@ -72,7 +72,7 @@ public sealed class PartySourceOrderSegmenterTests
             PartyCandidateRegion.Appendix, PartyCandidateRegion.Appendix
         }, x.Blocks.Select(b => b.Region));
         Assert.Equal(d.BodyBlocks.Select(b => b.SourcePath), x.Blocks.Select(b => b.Source.SourcePath));
-        Assert.Single(x.Blocks.Where(b => b.Source.Kind == "table"));
+        Assert.Single(x.Blocks, b => b.Source.Kind == "table");
         Assert.All(x.Blocks.Where(b => b.Source.Kind == "table"),
             b => Assert.Equal(PartyCandidateRegion.Unclassified, b.Region));
         Assert.Equal(x.Blocks.Count, x.Blocks.Select(b => b.Source.SourcePath).Distinct().Count());
