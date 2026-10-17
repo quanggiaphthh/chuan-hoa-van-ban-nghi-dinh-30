@@ -125,3 +125,15 @@ Phạm vi xác minh mở rộng chỉ khi code thực tế ảnh hưởng contra
 - **Quyết định cập nhật:** `P0C_FOUNDATION_IMPLEMENTED_AND_TESTED`; `P0C_END_TO_END_NOT_DONE`; `P0B_NOT_STARTED`; `P0A_BLOCKED_PENDING_VERIFIED_PARTY_RULES`; `PRODUCTION_AUTO_FIX_NO_GO`. PR #11 vẫn Draft và `main` không thay đổi.
 
 Đối chiếu chi tiết: [ATOMIC-REUSE-AUDIT-V13.md](./ATOMIC-REUSE-AUDIT-V13.md), [GAP-AUDIT-V12.md](./GAP-AUDIT-V12.md).
+
+## 9. Đối chiếu thực thi P0-B từ PR #12 (17/10/2026)
+
+**Báo cáo V14 gốc được lập trước khi có mã P0-B.** Kết quả mới dưới đây thay thế trạng thái `P0B_NOT_STARTED` ở §8 nhưng **không** nâng quyền cho canonical Party rules hay HD05 auto-fix.
+
+- [PR #12](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/pull/12) là **stacked PR** trên nhánh P0-C của [PR #11](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/pull/11), chỉ thay 3 file: bộ `PartySourceOrderSegmenter` (mã nguồn mới, không sửa `AdministrativeSemanticDetector`), 7 test xUnit và workflow riêng.
+- Thành phần mới dùng trực tiếp `DocumentModel.BodyBlocks`, tạo 5 vùng **ứng viên** `Front/Body/End/Appendix/Unclassified` và gắn `BodyBlockReference`; yêu cầu tiêu đề Đảng chính xác, body/end anchors tường minh; thiếu mốc, source order không hợp lệ hoặc ownership trùng thì fail closed. Bảng và SDT chưa hỗ trợ được giữ `Unclassified`. Kết quả **luôn** yêu cầu rà soát; không có quyền tự động sửa.
+- [GitHub Actions run #39026179901](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39026179901) trên commit `0e9828a9ec43040f03b2f39016a2135a1f91717c`: .NET 10 restore/build **PASS**, **7/7** Party test PASS, full solution **182/182 PASS** (`DocumentEngine 56`, `SemanticDetector 20`, `LegalValidator 106`); không có failed/skipped. Pull-request run cùng commit [#39026223574](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39026223574) cũng thành công.
+- Còn **2 cảnh báo biên dịch nullable vốn có** ở `SafeDocxSnapshot.cs` dòng 74 và 79; cảnh báo xUnit2031 mới đã được sửa, không sửa subsystem bảo mật chỉ để xóa cảnh báo ngoài scope.
+- **Chưa làm:** nhận diện tất cả biến thể thể thức Đảng (nhất là tiêu đề nằm trong bảng, công văn có nhiều dòng nơi nhận, tờ trình, đa chữ ký, phụ lục không có anchor điển hình), tích hợp đầu ra với Party regime routing/canonical validation, chạy QA 88 tình huống Hướng dẫn 05 trên fixture thực tế.
+- **Quyết định hiện hành:** `P0B_CONSERVATIVE_CANDIDATE_SEGMENTER_IMPLEMENTED_AND_TESTED`; `P0B_FULL_TYPE_COVERAGE_NOT_DONE`; `P0A_BLOCKED_PENDING_VERIFIED_PARTY_RULES`; `PRODUCTION_AUTO_FIX_NO_GO`. Không merge PR #10/#11/#12 khi chưa review quyền/scope; `main` giữ nguyên.
+
