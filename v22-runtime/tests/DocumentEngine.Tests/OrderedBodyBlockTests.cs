@@ -70,6 +70,45 @@ public sealed class OrderedBodyBlockTests
     }
 
     [Fact]
+    public void Unsupported_direct_body_container_is_unclassified_not_claimed_as_body()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"p0c-container-{Guid.NewGuid():N}.docx");
+        try
+        {
+            using (var package = WordprocessingDocument.Create(path, WordprocessingDocumentType.Document))
+            {
+                var main = package.AddMainDocumentPart();
+                main.Document = new W.Document(
+                    new W.Body(
+                        Paragraph("before"),
+                        new W.SdtBlock(
+                            new W.SdtProperties(),
+                            new W.SdtContentBlock(Paragraph("inside an SDT"))
+                        ),
+                        Paragraph("after")
+                    )
+                );
+                main.Document.Save();
+            }
+
+            var parsed = new DocxParser().Parse(path);
+            Assert.NotNull(parsed.Document);
+            var document = parsed.Document!;
+            Assert.Equal(new[] { "paragraph", "unclassified", "paragraph" },
+                document.BodyBlocks.Select(b => b.Kind));
+            Assert.Equal(new[] { "p1", null, "p2" }, document.BodyBlocks.Select(b => b.ModelId));
+            Assert.Equal("sdt", document.BodyBlocks[1].ElementName);
+            Assert.Equal("/w:document/w:body/*[2]", document.BodyBlocks[1].SourcePath);
+            Assert.Equal(2, document.Paragraphs.Count);
+            Assert.Empty(document.Tables);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void Existing_table_fixture_retains_paragraph_and_table_ids()
     {
         var path = Path.GetFullPath(Path.Combine(
