@@ -57,7 +57,7 @@ Mã `R01–R29` là mã tài liệu V12, **không phải canonical ID**. Cột t
 | R24 | Số trang/định vị/ẩn trang đầu | Headers/footers/fields | BLOCKED: cần field+render evidence |
 | R25 | Số trang phụ lục độc lập | Section/appendix numbering | BLOCKED: cần round-trip evidence |
 | R26 | Dấu bản sao 80×50 mm | Copy evidence | BLOCKED: không xác nhận vật mang tin bằng OOXML |
-| R27 | Màu đỏ, kiểu và cỡ chữ dấu sao | Copy evidence | BLOCKED: mực thật cần kiểm ngoài DOCX |
+| R27 | Màu đỏ, kiểu và cỡ chữ dấu bản sao | Copy evidence | BLOCKED: mực thật cần kiểm ngoài DOCX |
 | R28 | Ký hiệu BS/sổ cấp số bản sao | Applicability + external registry | BLOCKED: không tự cấp số |
 | R29 | Hai chữ ký số bản sao điện tử | Signed/protected safety contract | BLOCKED: thiếu chứng minh PKI |
 
