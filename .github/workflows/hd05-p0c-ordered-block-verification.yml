@@ -1,0 +1,41 @@
+name: HD05 P0-C ordered body verification
+
+on:
+  push:
+    branches:
+      - feature/hd05-p0c-ordered-block-provenance
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hd05-p0c-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ordered-body-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore v22-runtime/DocumentEngine.slnx
+      - name: Build
+        run: dotnet build v22-runtime/DocumentEngine.slnx --no-restore -c Release
+      - name: Targeted P0-C tests
+        run: dotnet test v22-runtime/tests/DocumentEngine.Tests/DocumentEngine.Tests.csproj --no-build -c Release --filter FullyQualifiedName~OrderedBodyBlockTests --logger "trx;LogFileName=p0c.trx"
+      - name: Full .NET solution regression
+        run: dotnet test v22-runtime/DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=p0c-regression.trx"
+      - name: Save test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hd05-p0c-dotnet-test-evidence
+          path: |
+            v22-runtime/tests/*/TestResults/*.trx
+          if-no-files-found: warn
