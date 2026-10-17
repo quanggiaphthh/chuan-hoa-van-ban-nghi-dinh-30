@@ -142,6 +142,32 @@ public sealed class PartySourceOrderSegmenterTests
     }
 
     [Fact]
+    public void Duplicated_model_owner_or_source_path_requires_manual_review()
+    {
+        var d = D(P("ĐẢNG CỘNG SẢN VIỆT NAM"),
+            P("Căn cứ quy định"), P("Nơi nhận:"));
+
+        var duplicateModel = d with
+        {
+            BodyBlocks = d.BodyBlocks.Select((b, i) =>
+                i == 1 ? b with { ModelId = "p1" } : b).ToArray()
+        };
+        var duplicatePath = d with
+        {
+            BodyBlocks = d.BodyBlocks.Select((b, i) =>
+                i == 1 ? b with { SourcePath = d.BodyBlocks[0].SourcePath } : b).ToArray()
+        };
+        foreach (var input in new[] { duplicateModel, duplicatePath })
+        {
+            var result = new PartySourceOrderSegmenter().Segment(input);
+            Assert.True(result.RequiresReview);
+            Assert.Contains("DUPLICATE_BODY_BLOCK_PROVENANCE", result.Diagnostics);
+            Assert.All(result.Blocks, b =>
+                Assert.Equal(PartyCandidateRegion.Unclassified, b.Region));
+        }
+    }
+
+    [Fact]
     public void Unsupported_container_remains_unclassified_and_requires_review()
     {
         var d = D(P("ĐẢNG CỘNG SẢN VIỆT NAM"), P("QUYẾT ĐỊNH"),
