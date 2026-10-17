@@ -10,6 +10,7 @@ Thư mục này chứa tài liệu nghiên cứu về thể thức và kỹ thu�
 |---|---|
 | [DAC-TA-CHUAN-V12.md](./DAC-TA-CHUAN-V12.md) | Đặc tả hợp nhất V12: 17 mục; mô hình 9 thành phần thể thức; phân loại 25+8; phụ lục/bản sao; 29 nhóm quy tắc ứng viên; 88 tình huống QA được đề xuất |
 | [GAP-AUDIT-V12.md](./GAP-AUDIT-V12.md) | Đối chiếu REUSE FIRST với `source registry`, `rule pack`, `document model`, `rule model`, `applicability`; xác định các thành phần còn thiếu hoặc bị chặn |
+| [ATOMIC-REUSE-AUDIT-V13.md](./ATOMIC-REUSE-AUDIT-V13.md) | Kiểm toán tĩnh 29 nhóm → 59 thuộc tính nguyên tử ứng viên; bằng chứng reuse thực tế, giới hạn detector/parser/loader và điều kiện kiểm thử; **chưa là canonical rule** |
 
 ## Nguồn có thẩm quyền (ưu tiên trước tài liệu diễn giải)
 
@@ -33,7 +34,7 @@ Trước khi bổ sung rule hoặc component, đối chiếu với:
 - [Source Registry](../sources/registry.yaml), [Party Rule Pack](../rule-packs/party-document-format-2026.yaml)
 - [Rule Model](../RULE-MODEL.md), [Document Model](../DOCUMENT-MODEL.md), [Applicability](../APPLICABILITY.md), [Validation Results](../VALIDATION-RESULTS.md)
 
-Không tạo subsystem song song, không tạo canonical rules từ 29 mã `R01–R29` nếu chưa exact-dedup và kiểm chứng. Đóng góp thay đổi source/rule/runtime bằng PR riêng và bằng chứng kiểm thử theo blast radius.
+Không tạo subsystem song song, không tạo canonical rules từ 29 mã `R01–R29` hoặc 59 property slots ứng viên nếu chưa exact-dedup và kiểm chứng. Đóng góp thay đổi source/rule/runtime bằng PR riêng và bằng chứng kiểm thử theo blast radius.
 
 ---
 *Tài liệu nghiên cứu; các mốc và quy tắc phải được thẩm định theo nguồn có thẩm quyền trước khi dùng làm căn cứ tự động hóa.*
