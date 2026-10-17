@@ -11,6 +11,7 @@ Thư mục này chứa tài liệu nghiên cứu về thể thức và kỹ thu�
 | [DAC-TA-CHUAN-V12.md](./DAC-TA-CHUAN-V12.md) | Đặc tả hợp nhất V12: 17 mục; mô hình 9 thành phần thể thức; phân loại 25+8; phụ lục/bản sao; 29 nhóm quy tắc ứng viên; 88 tình huống QA được đề xuất |
 | [GAP-AUDIT-V12.md](./GAP-AUDIT-V12.md) | Đối chiếu REUSE FIRST với `source registry`, `rule pack`, `document model`, `rule model`, `applicability`; xác định các thành phần còn thiếu hoặc bị chặn |
 | [ATOMIC-REUSE-AUDIT-V13.md](./ATOMIC-REUSE-AUDIT-V13.md) | Kiểm toán tĩnh 29 nhóm → 59 thuộc tính nguyên tử ứng viên; bằng chứng reuse thực tế, giới hạn detector/parser/loader và điều kiện kiểm thử; **chưa là canonical rule** |
+| [P0-READINESS-V14.md](./P0-READINESS-V14.md) | Kiểm toán sâu ba điểm nghẽn P0: release routing, Party semantic detection, thứ tự đoạn–bảng; yêu cầu thay đổi tối thiểu và gate test theo blast radius |
 
 ## Nguồn có thẩm quyền (ưu tiên trước tài liệu diễn giải)
 
