@@ -102,7 +102,7 @@ Các trường ở cột *property slot* là **định danh tư duy kỹ thuật
 
 ## 4. Thứ tự đóng các nút chặn theo blast radius
 
-| Ưu tiên | Núi chặn cụ thể | Lựa chọn tích hợp tối thiểu | Bằng chứng để đóng |
+| Ưu tiên | Nút chặn cụ thể | Lựa chọn tích hợp tối thiểu | Bằng chứng để đóng |
 |---|---|---|---|
 | P0 | Chưa có release Party verified và loader chọn release ND30 cố định | Thẩm định cơ chế chọn minimal party rule pack dựa trên hợp đồng hiện tại | Không nạp nhầm ND30; source locator/temporal/authority chính xác |
 | P0 | Detector chưa nhận diện tiêu đề `ĐẢNG CỘNG SẢN VIỆT NAM` theo regime | Thử extension rule/type detector, không sửa hành vi `AdministrativeSemanticDetector` cũ | Mẫu Đảng/công văn/tờ trình + negative test hành chính |
