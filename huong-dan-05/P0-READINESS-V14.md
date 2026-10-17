@@ -112,3 +112,16 @@ Phạm vi xác minh mở rộng chỉ khi code thực tế ảnh hưởng contra
 | Deploy / merge main | Có approval riêng và evidence | **NOT_AUTHORIZED** |
 
 **Hành động trong vòng này:** chỉ bổ sung file Markdown vào **Draft PR #10**, không sửa code/CI/release pack, không merge/commit `main`, không bật HD05 auto-fix.
+
+## 8. Đối chiếu thực thi P0-C từ PR #11 (17/10/2026)
+
+**Báo cáo này được lập trước khi có mã thử nghiệm; phần trạng thái ở §7 phản ánh thời điểm nghiên cứu. Cập nhật mới hơn (có bằng chứng):**
+
+- [PR #11](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/pull/11) triển khai nền tảng P0-C trên nhánh độc lập `feature/hd05-p0c-ordered-block-provenance`: `DocumentModel.BodyBlocks` bổ sung metadata nguồn, `DocxParser` duyệt trực tiếp `w:body` theo thứ tự, khối không xử lý được đánh dấu `unclassified`, giữ nguyên constructor và `Paragraphs/Tables`.
+- [Workflow kiểm thử chuyên biệt thành công](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39007188330): restore/build .NET 10 **PASS**; **3/3** test P0-C mới PASS; hồi quy **175/175** PASS (`DocumentEngine` 56, `SemanticDetector` 13, `LegalValidator` 106).
+- [Workflow repository đầy đủ thành công](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39007304541): chạy materializer, yêu cầu **zero source drift**, static safety audits, build .NET, targeted security/authorization/mutation tests, hồi quy **175/175**, host auth/safe errors/direct-alignment DOCX round-trip **PASS**. Bằng chứng ứng với commit `0754ae9ff286347bbea734d22b280968af2539f9`.
+- Workflow đầy đủ đã được khôi phục cấu hình trigger gốc sau kiểm thử; nhánh PR #11 có một gate chuyên biệt hoạt động qua push/PR. Không lấy một lần kiểm thử của commit khác để tự nhận bản sửa code mới nếu production files có thay đổi; cần đối chiếu commit/diff.
+- **Chưa hoàn thành toàn P0-C:** `AdministrativeSemanticDetector.Flatten()` vẫn có logic table-first phục vụ NĐ30, chưa được chuyển dùng `BodyBlocks` theo regime; chưa có nghiệm thu nguồn Party dạng `front/body/end/appendices`. Không tự động bật HD05 rules.
+- **Quyết định cập nhật:** `P0C_FOUNDATION_IMPLEMENTED_AND_TESTED`; `P0C_END_TO_END_NOT_DONE`; `P0B_NOT_STARTED`; `P0A_BLOCKED_PENDING_VERIFIED_PARTY_RULES`; `PRODUCTION_AUTO_FIX_NO_GO`. PR #11 vẫn Draft và `main` không thay đổi.
+
+Đối chiếu chi tiết: [ATOMIC-REUSE-AUDIT-V13.md](./ATOMIC-REUSE-AUDIT-V13.md), [GAP-AUDIT-V12.md](./GAP-AUDIT-V12.md).
