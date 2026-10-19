@@ -40,7 +40,7 @@ requires_capability:
   - "effective_style_complete_span"
 extensions:
   semantic_role: "party_heading"
-  legacy_candidate: "R01.02"
+  legacy_candidate: "NEW-V15.01"
   evidence_status: "original_pdf_read_and_page_viewed"
   confirmation_state: "NEEDS_INDEPENDENT_LEGAL_REVIEW"
   implementation_status: "NOT_IN_RUNTIME"
