@@ -17,8 +17,7 @@ temporality:
   effective_to: null
 target:
   object_type: "semantic_component"
-  role: "official_letter_subject"
-  property: "font_size_pt"
+  property: "official_letter_subject.font_size_pt"
 applicability:
   all:
     - field: "regime.value"
@@ -42,6 +41,7 @@ requires_capability:
   - "verified_semantic_role"
   - "effective_style_complete_span"
 extensions:
+  semantic_role: "official_letter_subject"
   legacy_candidate: "R10.01"
   evidence_status: "original_pdf_read_and_page_viewed"
   confirmation_state: "NEEDS_INDEPENDENT_LEGAL_REVIEW"
