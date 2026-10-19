@@ -72,3 +72,33 @@ Tối thiểu phải có `regime.value=party`, nguồn pháp lý theo **ngày ba
 5. Không tạo rule cho mặt sau theo suy đoán, hoặc tự động hoán đổi lề trên file người dùng chỉ dựa vào dự đoán kiểu in.
 
 **Trạng thái cuối:** `V16_SCOPE_MODEL_REVIEWABLE`; `CANONICAL_VERIFIED=0`; `PARTY_RULE_RUNTIME=OFF`; `AUTOFIX=PROHIBITED`.
+
+## 7. Bằng chứng DOCX thực nghiệm từ PR #17
+
+**Kiểm chứng kỹ thuật độc lập, không điều chỉnh pháp lý của 12 ứng viên.** [PR #17 — read-only DOCX evidence probes](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/pull/17) là PR code trên nền `main`, độc lập với PR #15/#16 và không import candidate rule; để tránh suy nghiệm thu chéo, so sánh theo riêng baseline từng PR.
+
+### 7.1. Mã nguồn và hành vi quan sát được
+
+- `v22-runtime/src/DocumentEngine/Formatting/DocxObservationProbes.cs`: `RunSpanObservationProbe` tính định dạng hiệu dụng **từng run** trên một đoạn có đủ provenance; yêu cầu toàn bộ run của đoạn đúng thứ tự, paragraph thực sự thuộc DOCX được parse; thiếu hoặc khác nhau trả `NotEvaluated`/`Different`, không lấy run đầu làm chuẩn.
+- Cùng tệp có `SectionMarginObservationProbe` lấy **giá trị lề mục tiêu do caller cung cấp**, đối chiếu bốn số `Margin*Twips` đã parse với điều kiện xác nhận hướng dọc/section/print intent. Không nhúng giá trị HD05 và không gọi `RuleEvaluator`.
+- Với mặt sau in hai mặt, trang ngang, thiếu lề hoặc thiếu thông tin ngữ cảnh, bộ đo trả `NotEvaluated`. **Không** coi `SectionModel` là chứng cứ số trang thật/mặt sau khi in, và không dùng phép đo chênh lệch twip như dung sai pháp lý.
+- Mọi kết quả luôn `RequiresReview=true`; mã chỉ đọc, không thay `SemanticValidationContextBuilder.AddFormatting()`, thư mục release, canonical rules, DOCX writer, nguồn quy định hoặc các subsystem bảo mật.
+
+### 7.2. Bằng chứng chạy thật
+
+- [Focused test trên mã sau khi bổ sung guard provenance — #39231061897](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39231061897): .NET 10 build/restore, **9/9 bài DOCX** mới đạt, toàn bộ **181/181** bài hồi quy đạt (DocumentEngine 62, SemanticDetector 13, LegalValidator 106), 0 fail/skipped.
+- [Full canonical verification — #39231296023](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39231296023): **PASS** materializer regeneration zero drift, V22/V23/static safety, .NET, authorization/mutation, **181/181** regression, processor host/auth và direct-alignment DOCX round-trip. Workflow dùng chung đã được trả về trigger gốc sau kiểm thử.
+- Hai cảnh báo CS8604 tồn tại sẵn trong `SafeDocxSnapshot.cs` (dòng 74/79), ngoài blast radius của PR #17.
+
+### 7.3. Diễn giải nghiệm thu và điều kiện còn mở
+
+| Thành phần | Kết luận |
+|---|---|
+| Quan sát **toàn run** trong một paragraph có provenance | `IMPLEMENTED_AND_TESTED_AS_READ_ONLY_PROBE` |
+| Mixed font-size/bold, kế thừa style, sai hoặc thiếu run | `NEGATIVE_CASES_PASS` |
+| Lề section đứng, nguồn dữ liệu có điều kiện | `CANDIDATE_METADATA_COMPARISON_TESTED` |
+| In hai mặt mặt sau / page parity / section landscape | `NOT_EVALUATED_FAIL_CLOSED` — không tự suy |
+| Semantic component span nhiều paragraph, bảng phức tạp | `NOT_CERTIFIED` |
+| Party runtime rules / legal verified / auto-fix | `NO_GO` |
+
+**Điều kiện không thay đổi:** cả 12 YAML tại PR #15/#16 vẫn `maturity=extracted`, `autofix.policy=PROHIBITED`. Không dùng chứng cứ này để tự động nâng `reviewed`/`verified`; cần reviewer độc lập xét nguồn, role, applicability và khả năng đánh giá thật của adapter trước.
