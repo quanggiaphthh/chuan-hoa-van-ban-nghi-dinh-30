@@ -13,6 +13,7 @@ Thư mục này chứa tài liệu nghiên cứu về thể thức và kỹ thu�
 | [ATOMIC-REUSE-AUDIT-V13.md](./ATOMIC-REUSE-AUDIT-V13.md) | Kiểm toán tĩnh 29 nhóm → 59 thuộc tính nguyên tử ứng viên; bằng chứng reuse thực tế, giới hạn detector/parser/loader và điều kiện kiểm thử; **chưa là canonical rule** |
 | [P0-READINESS-V14.md](./P0-READINESS-V14.md) | Kiểm toán sâu ba điểm nghẽn P0: release routing, Party semantic detection, thứ tự đoạn–bảng; yêu cầu thay đổi tối thiểu và gate test theo blast radius |
 | [CANONICAL-REVIEW-V15.md](./CANONICAL-REVIEW-V15.md) | Hồ sơ thẩm định 12 quy tắc nguyên tử ở trạng thái extracted; truy vết Phụ lục 2 và Phần II.IV.4.1, bất biến schema và giới hạn cấp quyền |
+| [APPLICABILITY-REVIEW-V16.md](./APPLICABILITY-REVIEW-V16.md) | Hiệu chỉnh 4 điều kiện lề và phân xử 12 ứng viên theo tài liệu gốc, mixed-runs, mặt sau in hai mặt, trang ngang và những phép kiểm thử âm tính |
 | [candidates-v15/](./candidates-v15/) | 12 tệp YAML ứng viên theo schema hiện hữu và script kiểm tra; **không nằm trong runtime/rule pack, không verified, không auto-fix** |
 
 ## Nguồn có thẩm quyền (ưu tiên trước tài liệu diễn giải)
