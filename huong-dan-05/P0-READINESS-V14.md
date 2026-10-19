@@ -137,3 +137,23 @@ Phạm vi xác minh mở rộng chỉ khi code thực tế ảnh hưởng contra
 - **Chưa làm:** nhận diện tất cả biến thể thể thức Đảng (nhất là tiêu đề nằm trong bảng, công văn có nhiều dòng nơi nhận, tờ trình, đa chữ ký, phụ lục không có anchor điển hình), tích hợp đầu ra với Party regime routing/canonical validation, chạy QA 88 tình huống Hướng dẫn 05 trên fixture thực tế.
 - **Quyết định hiện hành:** `P0B_CONSERVATIVE_CANDIDATE_SEGMENTER_IMPLEMENTED_AND_TESTED`; `P0B_FULL_TYPE_COVERAGE_NOT_DONE`; `P0A_BLOCKED_PENDING_VERIFIED_PARTY_RULES`; `PRODUCTION_AUTO_FIX_NO_GO`. Không merge PR #10/#11/#12 khi chưa review quyền/scope; `main` giữ nguyên.
 
+## 10. Mở rộng tình huống P0-B — PR #13 (19/10/2026)
+
+**PR mã nguồn:** [#13 — P0-B edge-cases](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/pull/13) đặt base trên PR #12; không cập nhật `main`, chưa merge và không bật các quy tắc Đảng tự sửa DOCX.
+
+**Bổ sung tối thiểu, chỉ 2 file triển khai/test:** `PartySourceOrderSegmenter.cs`, `PartySourceOrderSegmenterTests.cs`.
+
+- **Tiêu đề Đảng trong bảng:** nhận diện chính xác khi duy nhất một ô có chuỗi `ĐẢNG CỘNG SẢN VIỆT NAM` ở vùng đầu văn bản; cả bảng vẫn là `Unclassified` và yêu cầu rà soát. Nếu đồng thời phát hiện `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM` trong vùng đầu thì trả `CONFLICTING_STATE_AND_PARTY_HEADINGS`.
+- **Nhiều phụ lục:** thêm `PartyAppendixBoundary` có thứ tự, đường dẫn XML và nhãn nhận diện; trùng nhãn được cảnh báo. Không suy ra nội dung bảng/phụ lục đã được cấu trúc hóa hay ký hợp lệ.
+- **Nhiều dòng ký:** thêm `PartySigningBoundary` (vị trí, prefix, đường dẫn nguồn), nhận diện mốc trong vùng End, không gán danh tính, thẩm quyền hoặc chữ ký số; khi nhiều tiền tố ký thì báo cần rà soát.
+- **Fail-closed:** thiếu ranh giới phần thân/phần cuối, tiêu đề nằm trong bảng không rõ vùng, ký hiệu bất thường và khối không hỗ trợ không được tự tạo hoặc gán vào vùng nội dung xác thực.
+- **Không thay đổi** `AdministrativeSemanticDetector`, bộ 435 rule ND30, `RuleCatalog`, các hành vi mutation/safety, hoặc DOCX runtime làm văn bản thật.
+
+**Bằng chứng kiểm thử (19/10/2026):**
+
+1. [P0-B focused + regression run 39210492274](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39210492274): **13/13** test riêng P0-B và **188/188** test .NET toàn solution PASS, 0 failed/skipped.
+2. [Full canonical verification run 39210613347](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39210613347): **PASS** tại commit `e42ee36a7094c0f4c0ac3d5ce4bbaa2b3c6a8430`: materializer `zero source drift`, V22/V23 security/static audits, .NET 10 build, authorization/mutation tests, **188/188** full regressions, host boundary và direct-alignment DOCX round-trip PASS.
+3. Trigger workflow dùng chung đã được trả về trạng thái gốc. Chỉ hai tệp P0-B mới xuất hiện trong diff PR #13 đối với base PR #12; sau full-gate chỉ thay đổi trigger workflow. Các kiểm thử được ghi ở đây là bằng chứng thực tế nhưng **không chứng minh** bao phủ đủ mọi mẫu thể thức Party.
+
+**Giới hạn:** Những mốc ở đây là *candidate*, luôn `RequiresReview=true`. Chưa có canonical Party verified rules, chưa có Party release manifest hoặc thẩm định 88 tình huống QA theo quy định, chưa phân tích đầy đủ SDT/drawing/nested table, chưa tự động sửa văn bản theo Hướng dẫn 05. **P0-A runtime NO-GO** cho tới khi có quyền nguồn/authority, source locator, xác minh pháp lý và test cần thiết.
+
