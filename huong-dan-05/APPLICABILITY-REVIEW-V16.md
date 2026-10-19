@@ -102,3 +102,37 @@ Tối thiểu phải có `regime.value=party`, nguồn pháp lý theo **ngày ba
 | Party runtime rules / legal verified / auto-fix | `NO_GO` |
 
 **Điều kiện không thay đổi:** cả 12 YAML tại PR #15/#16 vẫn `maturity=extracted`, `autofix.policy=PROHIBITED`. Không dùng chứng cứ này để tự động nâng `reviewed`/`verified`; cần reviewer độc lập xét nguồn, role, applicability và khả năng đánh giá thật của adapter trước.
+
+## 8. Kết nối quan sát DOCX với ValidationContext — PR #18
+
+**Kiểm chứng mới ngày 19/10/2026.** [PR #18](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/pull/18) tiếp tục **trên PR #17** (nhánh đọc bằng chứng DOCX), **không phụ thuộc hoặc merge** các PR mã nguồn P0-B #12/#13, và **không nhập** các ứng viên YAML của PR #15/#16. Vì baseline khác nhau, bộ test 191 bài của PR #18 không đại diện cho hồi quy tất cả nhánh khác.
+
+### 8.1. Kết quả thực thi
+
+- Tệp mới `v22-runtime/src/LegalValidator/Adapters/PartyObservationContextBridge.cs` tái sử dụng `RunSpanObservationProbe`, `SectionMarginObservationProbe`, `ValidationContext`, `ValidationStatus` và `EvidenceRecord`. Không thay `SemanticValidationContextBuilder` đã sử dụng cho NĐ30.
+- Kết quả đồng nhất hoặc nhiều run khác nhau được lưu dưới khoá cách ly `party_candidate.<id>.<property>` với nguồn `EvidenceAuthority.Derived`, `RequiresReview=true`, đánh dấu `UncertainTargets` và trả về `NEEDS_REVIEW`. Không nhận trạng thái PASS/FAIL pháp lý từ metadata DOCX.
+- Khi thiếu run, sai hoặc trùng nguồn, không xác nhận section, trang ngang, thiếu dữ kiện in hai mặt, hoặc đối chiếu mặt sau vật lý: trả `NOT_EVALUATED`, **không tự bịa observation**.
+- `Create()` thiết lập `DocumentPatchPolicy=PROHIBITED`, không cấp `AvailableCapabilities`, không tự điền `regime.value=party` hay xác nhận semantic role. Không nạp các rule `extracted` vào `RuleEvaluator`.
+- 10 kiểm thử xUnit mới dùng DOCX thật và RuleEvaluator kiểm tra các tình huống âm tính. Trường hợp thử quy tắc `verified` là **đối tượng unit test giả lập, không được đưa vào RuleCatalog**; khi thiếu capability trả `NOT_EVALUATED`, khi thử thêm capability test-only nhưng target chưa chắc chắn trả `NEEDS_REVIEW`, không PASS.
+
+### 8.2. Bằng chứng và phạm vi
+
+- [CI đơn vị và hồi quy V18 #39249429451](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39249429451): **10/10** targeted, **191/191** full solution PASS; 0 lỗi/skip.
+- [Full canonical workflow #39249673689](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39249673689): **PASS** zero source drift, static/security, .NET 10 build, authorization/mutation, **191/191** hồi quy, processor host authentication và DOCX direct-alignment round-trip.
+- Workflow dùng chung được khôi phục cấu hình gốc sau xác minh. Diff dự kiến của PR #18 chỉ là bridge, tests, workflow riêng.
+- Còn 2 cảnh báo nullable CS8604 có sẵn ở `SafeDocxSnapshot.cs`, không phải lỗi mới của adapter.
+
+### 8.3. Điều kiện chặn trước khi quy tắc pháp lý được phép đánh giá
+
+| Bằng chứng | Trạng thái |
+|---|---|
+| Chuyển DOCX observation → ValidationContext cho Party candidate | `PROBE_BRIDGE_IMPLEMENTED_AND_TESTED` |
+| Không trả PASS/FAIL pháp lý từ metadata chưa thẩm định | `FAIL_CLOSED_TESTED` |
+| Role nguồn Đảng theo PL1/PL2 và span có thẩm quyền | `NOT_VERIFIED` |
+| Tích hợp `PartySourceOrderSegmenter` từ chuỗi PR #11–#13 | `NOT_INTEGRATED` |
+| Resolver trang vật lý khi in hai mặt / trang ngang | `NOT_AVAILABLE` |
+| 12 rule HD05 từ `extracted` → `reviewed/verified` | `NO_GO` |
+| Tự sửa DOCX theo HD05 | `PROHIBITED` |
+
+**Nhắc lại:** đây là adapter **đọc và lưu bằng chứng**, không phải validator Hướng dẫn 05 đã hoạt động. Phải review độc lập role/authority/temporal, bảo toàn content, tích hợp có kiểm thử và nguồn quy tắc verified trước khi bật bất kỳ chức năng nào đánh giá tuân thủ hoặc sửa DOCX.
+
