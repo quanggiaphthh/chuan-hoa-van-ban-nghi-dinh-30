@@ -55,6 +55,18 @@ public sealed class RunSpanObservationProbe
         RunSpanObservation Unknown(string code) =>
             new(ObservationOutcome.NotEvaluated, code, runIds.ToArray(), null, null, []);
 
+        // The selected paragraph must belong to this parsed DOCX; otherwise a
+        // caller could accidentally measure an unrelated or reconstructed block.
+        var belongsToDocument = document.Paragraphs.Any(p => ReferenceEquals(p, paragraph))
+            || document.Tables.SelectMany(t => t.Rows).SelectMany(r => r.Cells)
+                .SelectMany(c => c.Paragraphs).Any(p => ReferenceEquals(p, paragraph))
+            || document.Headers.SelectMany(h => h.Paragraphs)
+                .Any(p => ReferenceEquals(p, paragraph))
+            || document.Footers.SelectMany(f => f.Paragraphs)
+                .Any(p => ReferenceEquals(p, paragraph));
+        if (!belongsToDocument)
+            return Unknown("PARAGRAPH_PROVENANCE_NOT_CONFIRMED");
+
         // Require complete, source-ordered paragraph coverage. A selection of one
         // convenient run must never certify a paragraph containing different runs.
         if (paragraph.Runs.Count == 0
