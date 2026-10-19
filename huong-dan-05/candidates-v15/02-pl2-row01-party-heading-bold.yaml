@@ -17,8 +17,7 @@ temporality:
   effective_to: null
 target:
   object_type: "semantic_component"
-  role: "party_heading"
-  property: "bold"
+  property: "party_heading.bold"
 applicability:
   all:
     - field: "regime.value"
@@ -40,6 +39,7 @@ requires_capability:
   - "verified_semantic_role"
   - "effective_style_complete_span"
 extensions:
+  semantic_role: "party_heading"
   legacy_candidate: "R01.02"
   evidence_status: "original_pdf_read_and_page_viewed"
   confirmation_state: "NEEDS_INDEPENDENT_LEGAL_REVIEW"
