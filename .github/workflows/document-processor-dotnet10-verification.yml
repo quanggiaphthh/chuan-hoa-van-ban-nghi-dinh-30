@@ -2,7 +2,7 @@ name: Document Processor .NET 10 Verification
 
 on:
   push:
-    branches: [codex/processor-canonical-20261002, feature/hd05-p0b-edge-cases]
+    branches: [codex/processor-canonical-20261002]
   workflow_dispatch:
 
 permissions:
