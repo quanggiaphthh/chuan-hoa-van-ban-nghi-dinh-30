@@ -14,6 +14,31 @@ public sealed class RuleCatalog
         ReleaseRuleIds = releaseRuleIds;
     }
 
+    /// <summary>
+    /// Explicit regime selection at the verified-release boundary. Keep the
+    /// established administrative release behavior identical. Party source
+    /// registry entries and selector packs are NOT verified runtime releases.
+    /// Until a separately reviewed Party release exists, fail closed rather
+    /// than loading ND30 or treating an empty candidate pack as compliant.
+    /// </summary>
+    public static RuleCatalog LoadForRegime(string root, string regime)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        if (string.IsNullOrWhiteSpace(regime))
+            throw new ArgumentException("A document regime must be explicitly selected.", nameof(regime));
+
+        if (string.Equals(regime, "administrative", StringComparison.Ordinal))
+            return LoadVerifiedRelease(root);
+
+        if (string.Equals(regime, "party", StringComparison.Ordinal))
+            throw new NotSupportedException(
+                "PARTY_VERIFIED_RELEASE_UNAVAILABLE: No approved, verified Party canonical rule release is available. " +
+                "Registration of HD05/QD399 sources and a Party selector does not authorize runtime validation.");
+
+        throw new NotSupportedException(
+            "UNSUPPORTED_DOCUMENT_REGIME: Explicitly select a supported verified-rule regime.");
+    }
+
     public static RuleCatalog LoadVerifiedRelease(string root)
     {
         var releasePath = Path.Combine(root, "release", "admin-nd30-verified-rc-v20.yaml");
