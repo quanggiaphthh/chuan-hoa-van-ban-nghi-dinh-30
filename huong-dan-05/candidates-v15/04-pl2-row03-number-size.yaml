@@ -1,0 +1,50 @@
+# EXTRACTED CANDIDATE, NOT A VERIFIED RUNTIME RULE. NEVER IMPORT INTO release/.
+schema_version: "1.0"
+id: "PARTY.HD05.2026.PL2.ROW03.NUMBER.SIZE"
+regime: "party"
+domain: "document_format"
+source:
+  source_id: "VN-PARTY-HD05-2026"
+  locator:
+    appendix: "2"
+    row: "3"
+    subentry: "Số và ký hiệu văn bản"
+    pdf_page: 31
+normativity: "guidance"
+maturity: "extracted"
+temporality:
+  effective_from: "2026-05-27"
+  effective_to: null
+target:
+  object_type: "semantic_component"
+  role: "document_number"
+  property: "font_size_pt"
+applicability:
+  all:
+    - field: "regime.value"
+      operator: "equals"
+      value: "party"
+    - field: "document.class"
+      operator: "equals"
+      value: "official_party_document"
+
+constraint:
+  type: "equals"
+  value: 14
+validation:
+  severity: "LEGAL_WARNING"
+autofix:
+  policy: "PROHIBITED"
+requires_capability:
+  - "confirmed_party_regime"
+  - "verified_semantic_role"
+  - "effective_style_complete_span"
+extensions:
+  legacy_candidate: "R04.02"
+  evidence_status: "original_pdf_read_and_page_viewed"
+  confirmation_state: "NEEDS_INDEPENDENT_LEGAL_REVIEW"
+  implementation_status: "NOT_IN_RUNTIME"
+  label_vi: "Số và ký hiệu văn bản"
+  evidence_pdf: "https://tulieuvankien.dangcongsan.vn/upload/2006988/20260529/HD_05_VPTW_e1550.pdf"
+  source_pdf_page: 31
+  confidence_note: "Exact value sourced; technical role/applicability/observability require independent review."
