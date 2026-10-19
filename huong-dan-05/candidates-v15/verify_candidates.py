@@ -58,8 +58,15 @@ for i, (file, (suffix, minimum, maximum, page)) in enumerate(zip(files, expected
     assert conditions["document.class"] == "official_party_document"
     if i >= 9:
         assert conditions["document.page_orientation"] == "portrait"
-        assert conditions["document.page_side"] == "front_or_single"
-        assert constraint["value"] in (15,20,30)
+        assert "verified_page_orientation" in rule["requires_capability"]
+        if i in (9,10):  # top/bottom: still 20 mm on duplex back pages
+            assert "document.page_side" not in conditions
+            assert constraint["value"] == 20
+        else:  # left/right: mirrored only on duplex back pages
+            assert conditions["document.page_side"] == "front_or_single"
+            assert {"verified_print_side", "confirmed_duplex_or_single_sided_intent"}.issubset(
+                set(rule["requires_capability"]))
+            assert constraint["value"] in (15, 30)
     elif i == 7:
         assert conditions["document.type"] == "official_letter"
     elif i in (5,6):
@@ -76,3 +83,53 @@ party_selector = (REPO / "rule-packs/party-document-format-2026.yaml").read_text
 assert "VN-PARTY-HD05-2026" in party_selector
 assert "candidates-v15" not in party_selector, "Candidate files may never be activated through selector"
 print("HD05 V15 STATIC AUDIT PASS — 12/12 schema-valid extracted candidates; 12/12 values/source pages; 0 verified; 0 autofix; ND30 release 435 unchanged.")
+
+# V16: negative applicability matrix. This tests only the EXTRACTED YAML
+# conditions, not runtime support, renderer parity, or legal certification.
+def eligible_for_review(rule, facts, capabilities):
+    if not set(rule["requires_capability"]).issubset(capabilities):
+        return False
+    return all(
+        c["operator"] == "equals" and
+        c["field"] in facts and facts[c["field"]] == c["value"]
+        for c in rule["applicability"]["all"]
+    )
+
+def read(n):
+    return yaml.safe_load(files[n - 1].read_text(encoding="utf-8"))
+
+general = {"regime.value": "party", "document.class": "official_party_document",
+           "document.page_orientation": "portrait", "document.page_side": "front_or_single"}
+for n in range(9, 13):
+    rule = read(n)
+    caps = set(rule["requires_capability"])
+    assert eligible_for_review(rule, general, caps), f"Expected candidate to match front/single portrait {n}"
+    assert not eligible_for_review(rule, general | {"document.page_orientation": "landscape"}, caps)
+    assert not eligible_for_review(rule, general | {"regime.value": "administrative"}, caps)
+    assert not eligible_for_review(rule, general | {"document.class": "specialized"}, caps)
+    assert not eligible_for_review(rule, general, caps - {"verified_page_orientation"})
+    back = general | {"document.page_side": "back"}
+    if n in (9,10):
+        assert eligible_for_review(rule, back, caps), "Top/bottom must apply on duplex back"
+    else:
+        assert not eligible_for_review(rule, back, caps), "Front left/right cannot apply on duplex back"
+        assert not eligible_for_review(rule, general, caps - {"verified_print_side"})
+        assert not eligible_for_review(rule, general, caps - {"confirmed_duplex_or_single_sided_intent"})
+        assert not eligible_for_review(rule, {k:v for k,v in general.items() if k != "document.page_side"}, caps)
+
+# Mixed-run and uncertain-role formatting cannot be marked as observable.
+for n in range(1, 9):
+    rule = read(n)
+    facts = {c["field"]: c["value"] for c in rule["applicability"]["all"]}
+    caps = set(rule["requires_capability"])
+    assert "effective_style_complete_span" in caps
+    assert eligible_for_review(rule, facts, caps)
+    assert not eligible_for_review(rule, facts, caps - {"effective_style_complete_span"})
+    assert not eligible_for_review(rule, facts, caps - {"verified_semantic_role"})
+    assert not eligible_for_review(rule, facts | {"regime.value": "administrative"}, caps)
+    if n == 7:
+        assert not eligible_for_review(rule, facts | {"document.type": "decision"}, caps)
+    if n in (5, 6):
+        assert not eligible_for_review(rule, facts | {"document.heading_variant": "letter"}, caps)
+
+print("HD05 V16 APPLICABILITY STATIC MATRIX PASS — 4 margin cases and 8 formatting roles; portrait/duplex/landscape, role, regime, incomplete-run negatives. NOT a DOCX runtime test.")
