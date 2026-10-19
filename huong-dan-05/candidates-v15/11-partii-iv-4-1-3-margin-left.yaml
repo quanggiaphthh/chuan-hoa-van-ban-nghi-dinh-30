@@ -40,8 +40,11 @@ autofix:
 requires_capability:
   - "confirmed_party_regime"
   - "verified_section_ownership"
-  - "page_side_and_orientation"
+  - "verified_page_orientation"
+  - "verified_print_side"
+  - "confirmed_duplex_or_single_sided_intent"
 extensions:
+  applicability_review_v16: "left_right_front_or_single_only; if print side unknown or landscape return NOT_EVALUATED; physical back side follows HD05_II_IV_4_2"
   semantic_role: "normal_page_section"
   legacy_candidate: "R22.03"
   evidence_status: "original_pdf_read_and_page_viewed"
