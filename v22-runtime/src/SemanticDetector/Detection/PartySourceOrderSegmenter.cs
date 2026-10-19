@@ -122,7 +122,8 @@ public sealed class PartySourceOrderSegmenter
             diagnostics.Add(body < 0 ? "BODY_START_NOT_CONFIRMED" : "END_START_NOT_CONFIRMED");
             // Only the exact Party title is identified; no unknown signature or
             // appendix can be accidentally given ownership by the body fallback.
-            projected[heading] = projected[heading] with { Region = PartyCandidateRegion.Front };
+            if (projected[heading].Source.Kind == "paragraph")
+                projected[heading] = projected[heading] with { Region = PartyCandidateRegion.Front };
             diagnostics.Add("PARTY_CANDIDATES_REQUIRE_HUMAN_REVIEW");
             return new(projected, true, diagnostics);
         }
@@ -136,7 +137,8 @@ public sealed class PartySourceOrderSegmenter
         if (appendices.Select(a => Canon(a.Heading)).Distinct(StringComparer.Ordinal).Count() < appendices.Length)
             diagnostics.Add("REPEATED_APPENDIX_HEADING_REQUIRES_REVIEW");
 
-        var signatures = Enumerable.Range(end, projected.Length - end)
+        var signatureRegionEnd = appendixIndices.Length == 0 ? projected.Length : appendixIndices[0];
+        var signatures = Enumerable.Range(end, signatureRegionEnd - end)
             .Where(i => projected[i].Source.Kind == "paragraph"
                 && SigningPrefix.IsMatch(projected[i].Text))
             .Select(i => new PartySigningBoundary(projected[i].Source.Order,
