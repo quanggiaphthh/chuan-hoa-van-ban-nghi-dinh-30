@@ -15,7 +15,6 @@ temporality:
   effective_to: null
 target:
   object_type: "section"
-  role: "normal_page_section"
   property: "margin_right_mm"
 applicability:
   all:
@@ -43,6 +42,7 @@ requires_capability:
   - "verified_section_ownership"
   - "page_side_and_orientation"
 extensions:
+  semantic_role: "normal_page_section"
   legacy_candidate: "R22.04"
   evidence_status: "original_pdf_read_and_page_viewed"
   confirmation_state: "NEEDS_INDEPENDENT_LEGAL_REVIEW"
