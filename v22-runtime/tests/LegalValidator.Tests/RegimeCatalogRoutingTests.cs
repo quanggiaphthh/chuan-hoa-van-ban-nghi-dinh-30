@@ -23,7 +23,7 @@ public sealed class RegimeCatalogRoutingTests
     {
         var root = FindRoot();
         var original = RuleCatalog.LoadVerifiedRelease(root);
-        var routed = RuleCatalog.LoadForRegime(root, "administrative");
+        var routed = VerifiedRegimeCatalogRouter.LoadForRegime(root, "administrative");
         Assert.Equal(435, routed.Rules.Count);
         Assert.Equal(original.ReleaseRuleIds.OrderBy(id => id, StringComparer.Ordinal),
             routed.ReleaseRuleIds.OrderBy(id => id, StringComparer.Ordinal));
@@ -43,7 +43,7 @@ public sealed class RegimeCatalogRoutingTests
             "..", "rule-packs", "party-document-format-2026.yaml"));
         Assert.True(File.Exists(selector), "Party selector is expected to exist but is NOT a verified release.");
         var error = Assert.Throws<NotSupportedException>(
-            () => RuleCatalog.LoadForRegime(root, "party"));
+            () => VerifiedRegimeCatalogRouter.LoadForRegime(root, "party"));
         Assert.Contains("PARTY_VERIFIED_RELEASE_UNAVAILABLE", error.Message);
     }
 
@@ -58,7 +58,7 @@ public sealed class RegimeCatalogRoutingTests
             File.WriteAllText(Path.Combine(release, "party-hd05-verified.yaml"),
                 "{\"regime\":\"party\",\"rules\":[\"PARTY.DRAFT.001\"]}");
             var ex = Assert.Throws<NotSupportedException>(
-                () => RuleCatalog.LoadForRegime(root, "party"));
+                () => VerifiedRegimeCatalogRouter.LoadForRegime(root, "party"));
             Assert.Contains("PARTY_VERIFIED_RELEASE_UNAVAILABLE", ex.Message);
         }
         finally
@@ -76,7 +76,7 @@ public sealed class RegimeCatalogRoutingTests
     public void Unknown_or_noncanonical_regimes_never_fall_back_to_nd30(string regime)
     {
         var ex = Assert.Throws<NotSupportedException>(
-            () => RuleCatalog.LoadForRegime(FindRoot(), regime));
+            () => VerifiedRegimeCatalogRouter.LoadForRegime(FindRoot(), regime));
         Assert.Contains("UNSUPPORTED_DOCUMENT_REGIME", ex.Message);
     }
 
@@ -87,6 +87,6 @@ public sealed class RegimeCatalogRoutingTests
     public void Missing_regime_is_rejected_before_any_release_is_read(string? regime)
     {
         Assert.Throws<ArgumentException>(
-            () => RuleCatalog.LoadForRegime(FindRoot(), regime!));
+            () => VerifiedRegimeCatalogRouter.LoadForRegime(FindRoot(), regime!));
     }
 }
