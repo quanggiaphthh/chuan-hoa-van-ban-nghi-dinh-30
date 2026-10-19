@@ -157,3 +157,14 @@ Phạm vi xác minh mở rộng chỉ khi code thực tế ảnh hưởng contra
 
 **Giới hạn:** Những mốc ở đây là *candidate*, luôn `RequiresReview=true`. Chưa có canonical Party verified rules, chưa có Party release manifest hoặc thẩm định 88 tình huống QA theo quy định, chưa phân tích đầy đủ SDT/drawing/nested table, chưa tự động sửa văn bản theo Hướng dẫn 05. **P0-A runtime NO-GO** cho tới khi có quyền nguồn/authority, source locator, xác minh pháp lý và test cần thiết.
 
+## 11. P0-A — Kiểm chứng cổng chọn regime (19/10/2026)
+
+**Nhánh triển khai độc lập từ main:** [PR #14](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/pull/14); không dùng chung baseline với các PR #11–#13. Không cộng số test giữa các nhánh để suy ra kết quả cuối.
+
+**REUSE FIRST:** tạo tệp v22-runtime/src/LegalValidator/Catalog/VerifiedRegimeCatalogRouter.cs: lựa chọn administrative gọi RuleCatalog.LoadVerifiedRelease() hiện có với 435 quy tắc NĐ30; party trả PARTY_VERIFIED_RELEASE_UNAVAILABLE; chế độ không xác định trả UNSUPPORTED_DOCUMENT_REGIME. Không đổi bộ rule hành chính, nguồn quy định, engine hoặc chính sách tự sửa.
+
+**Phát hiện nguồn sinh mã và sửa chính xác:** [Workflow #39211607807](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39211607807) lần đầu FAIL do sửa trực tiếp RuleCatalog.cs bị payload V24 cố định SHA ghi đè khi tái tạo. Đã phục hồi RuleCatalog.cs trùng nguyên bản main và chuyển định tuyến vào adapter độc lập; không chỉnh sửa payload, không bỏ chốt SHA hoặc làm yếu yêu cầu zero source drift.
+
+**Kiểm chứng:** [GitHub Actions #39211824204](https://github.com/quanggiaphthh/chuan-hoa-van-ban-nghi-dinh-30/actions/runs/39211824204) tại commit b032bb330c70914dbc36441da907c2ea5c33333c: zero source drift PASS; static/security, restore/build, authorization/mutation tests PASS; 183/183 hồi quy PASS (DocumentEngine 53, SemanticDetector 13, LegalValidator 117), 0 lỗi/skip; host auth và DOCX round-trip PASS. Có 11/11 bài test chuyên biệt P0-A trước và sau điều chỉnh.
+
+**Chốt ranh giới:** P0A_SELECTOR_IMPLEMENTED_AND_TESTED; PARTY_VERIFIED_RELEASE_NOT_AVAILABLE; PARTY_RUNTIME_AND_AUTO_FIX_NO_GO. Chưa có canonical Party rules được phê duyệt, Party manifest verified, hoặc caller production dùng cổng chọn mới. PR #14 Draft; main không thay đổi; 29 nhóm và 59 thuộc tính của V12/V13 vẫn chỉ là ứng viên.
