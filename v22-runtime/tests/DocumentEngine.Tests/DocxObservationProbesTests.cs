@@ -146,6 +146,30 @@ public sealed class DocxObservationProbesTests
     }
 
     [Fact]
+    public void A_paragraph_from_another_docx_cannot_supply_formatting_evidence()
+    {
+        var firstFile = MakeDocument(true, false, false, false);
+        var secondFile = MakeDocument(true, false, false, false);
+        try
+        {
+            var first = Parse(firstFile);
+            var second = Parse(secondFile);
+            var foreignParagraph = Assert.Single(second.Paragraphs);
+            var assessment = new RunSpanObservationProbe().Observe(
+                first, foreignParagraph,
+                foreignParagraph.Runs.Select(r => r.Id).ToArray(),
+                ObservedRunProperty.FontSizePt);
+            Assert.Equal(ObservationOutcome.NotEvaluated, assessment.Outcome);
+            Assert.Equal("PARAGRAPH_PROVENANCE_NOT_CONFIRMED", assessment.Reason);
+        }
+        finally
+        {
+            File.Delete(firstFile);
+            File.Delete(secondFile);
+        }
+    }
+
+    [Fact]
     public void Missing_effective_font_size_is_not_evaluated()
     {
         var file = MakeDocument(false, false, false, false);
