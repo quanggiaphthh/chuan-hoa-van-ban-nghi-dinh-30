@@ -1,0 +1,32 @@
+name: HD05 V24 source-scoped evidence
+
+on:
+  push:
+    branches:
+      - feature/hd05-v24-source-scoped-evidence
+  pull_request:
+    paths:
+      - 'v22-runtime/src/LegalValidator/Adapters/PartySourceScopedEvidenceSession.cs'
+      - 'v22-runtime/tests/LegalValidator.Tests/PartySourceScopedEvidenceSessionTests.cs'
+      - '.github/workflows/hd05-v24-source-scoped-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  review-only-source-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore v22-runtime/DocumentEngine.slnx
+      - name: Build
+        run: dotnet build v22-runtime/DocumentEngine.slnx --no-restore -c Release
+      - name: Source-scoped review-only tests
+        run: dotnet test v22-runtime/tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter FullyQualifiedName~PartySourceScopedEvidenceSessionTests
+      - name: Full .NET regression
+        run: dotnet test v22-runtime/DocumentEngine.slnx --no-build -c Release
