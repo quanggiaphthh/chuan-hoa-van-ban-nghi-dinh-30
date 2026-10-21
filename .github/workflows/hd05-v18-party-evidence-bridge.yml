@@ -1,0 +1,43 @@
+name: HD05 V18 Party evidence bridge
+
+on:
+  push:
+    branches:
+      - feature/hd05-v18-party-evidence-context-bridge
+  pull_request:
+    paths:
+      - 'v22-runtime/src/LegalValidator/Adapters/PartyObservationContextBridge.cs'
+      - 'v22-runtime/tests/LegalValidator.Tests/PartyObservationContextBridgeTests.cs'
+      - '.github/workflows/hd05-v18-party-evidence-bridge.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hd05-v18-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  read-only-party-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore v22-runtime/DocumentEngine.slnx
+      - name: Build
+        run: dotnet build v22-runtime/DocumentEngine.slnx --no-restore -c Release
+      - name: Focused Party bridge guard tests
+        run: dotnet test v22-runtime/tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter FullyQualifiedName~PartyObservationContextBridgeTests --logger "trx;LogFileName=hd05-v18.trx"
+      - name: Full .NET solution regression
+        run: dotnet test v22-runtime/DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=hd05-v18-regression.trx"
+      - name: Save TRX
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hd05-v18-party-evidence
+          path: v22-runtime/tests/*/TestResults/*.trx
+          if-no-files-found: warn
