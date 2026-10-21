@@ -79,6 +79,106 @@ public sealed class PartySourceOrderSegmenterTests
     }
 
     [Fact]
+    public void Table_cell_party_heading_is_evidence_but_table_stays_unclassified()
+    {
+        var d = D(
+            T("ĐẢNG CỘNG SẢN VIỆT NAM"),
+            P("QUYẾT ĐỊNH"),
+            P("Điều 1. Quy định nội dung"),
+            P("Nơi nhận:"),
+            P("PHỤ LỤC 1"),
+            P("Danh sách"));
+        var x = new PartySourceOrderSegmenter().Segment(d);
+        Assert.True(x.RequiresReview);
+        Assert.Equal(new[]
+        {
+            PartyCandidateRegion.Unclassified, PartyCandidateRegion.Front,
+            PartyCandidateRegion.Body, PartyCandidateRegion.End,
+            PartyCandidateRegion.Appendix, PartyCandidateRegion.Appendix
+        }, x.Blocks.Select(b => b.Region));
+        Assert.Contains("PARTY_HEADING_IN_TABLE_UNCLASSIFIED", x.Diagnostics);
+        Assert.Single(x.AppendixBoundaries);
+        Assert.Equal(5, x.AppendixBoundaries[0].SourceOrder);
+        Assert.Equal("table", x.Blocks[0].Source.Kind);
+        Assert.Equal(d.BodyBlocks.Select(b => b.SourcePath), x.Blocks.Select(b => b.Source.SourcePath));
+    }
+
+    [Fact]
+    public void Table_heading_without_end_anchor_cannot_claim_table_ownership()
+    {
+        var d = D(T("ĐẢNG CỘNG SẢN VIỆT NAM"),
+            P("QUYẾT ĐỊNH"), P("Điều 1. Nội dung"), P("PHỤ LỤC 1"));
+        var x = new PartySourceOrderSegmenter().Segment(d);
+        Assert.True(x.RequiresReview);
+        Assert.All(x.Blocks, b => Assert.Equal(PartyCandidateRegion.Unclassified, b.Region));
+        Assert.Contains("END_START_NOT_CONFIRMED", x.Diagnostics);
+        Assert.Empty(x.AppendixBoundaries);
+    }
+
+    [Fact]
+    public void Conflicting_state_and_party_headers_require_review()
+    {
+        var d = D(P("ĐẢNG CỘNG SẢN VIỆT NAM"),
+            P("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"),
+            P("Điều 1. Nội dung"), P("Nơi nhận:"));
+        var x = new PartySourceOrderSegmenter().Segment(d);
+        Assert.Contains("CONFLICTING_STATE_AND_PARTY_HEADINGS", x.Diagnostics);
+        Assert.All(x.Blocks, b => Assert.Equal(PartyCandidateRegion.Unclassified, b.Region));
+    }
+
+    [Fact]
+    public void Multiple_appendices_have_separate_ordered_boundaries_without_claiming_tables()
+    {
+        var d = D(P("ĐẢNG CỘNG SẢN VIỆT NAM"),
+            P("QUYẾT ĐỊNH"), P("Điều 1. Nội dung"),
+            P("Nơi nhận:"), P("TM. BAN THƯỜNG VỤ"),
+            P("PHỤ LỤC 1"), P("Danh sách số một"),
+            P("PHỤ LỤC 2"), T("Bảng kèm phụ lục hai"), P("Danh sách số hai"));
+        var x = new PartySourceOrderSegmenter().Segment(d);
+        Assert.True(x.RequiresReview);
+        Assert.Equal(new[] { 1, 2 }, x.AppendixBoundaries.Select(a => a.Ordinal));
+        Assert.Equal(new[] { 6, 8 }, x.AppendixBoundaries.Select(a => a.SourceOrder));
+        Assert.Equal(new[] { "PHỤ LỤC 1", "PHỤ LỤC 2" }, x.AppendixBoundaries.Select(a => a.Heading));
+        Assert.Equal(PartyCandidateRegion.End, x.Blocks[4].Region);
+        Assert.Equal(PartyCandidateRegion.Appendix, x.Blocks[5].Region);
+        Assert.Equal(PartyCandidateRegion.Appendix, x.Blocks[7].Region);
+        Assert.Equal(PartyCandidateRegion.Unclassified, x.Blocks[8].Region);
+        Assert.Single(x.SigningBoundaries);
+        Assert.Equal(5, x.SigningBoundaries[0].SourceOrder);
+        Assert.DoesNotContain("REPEATED_APPENDIX_HEADING_REQUIRES_REVIEW", x.Diagnostics);
+    }
+
+    [Fact]
+    public void Repeated_appendix_heading_is_not_silently_trusted()
+    {
+        var d = D(P("ĐẢNG CỘNG SẢN VIỆT NAM"),
+            P("QUYẾT ĐỊNH"), P("Điều 1. Nội dung"),
+            P("Nơi nhận:"), P("PHỤ LỤC 1"), P("Bảng A"),
+            P("PHỤ LỤC 1"), P("Bảng B"));
+        var x = new PartySourceOrderSegmenter().Segment(d);
+        Assert.Equal(2, x.AppendixBoundaries.Count);
+        Assert.Contains("REPEATED_APPENDIX_HEADING_REQUIRES_REVIEW", x.Diagnostics);
+        Assert.True(x.RequiresReview);
+    }
+
+    [Fact]
+    public void Multiple_signature_prefixes_are_evidence_not_signer_identity()
+    {
+        var d = D(P("ĐẢNG CỘNG SẢN VIỆT NAM"),
+            P("QUYẾT ĐỊNH"), P("Điều 1. Nội dung"),
+            P("K/T CHÁNH VĂN PHÒNG"), P("TM. BAN THƯỜNG VỤ"),
+            P("PHỤ LỤC I"), P("Danh sách"));
+        var x = new PartySourceOrderSegmenter().Segment(d);
+        Assert.Equal(new[] { 4, 5 }, x.SigningBoundaries.Select(b => b.SourceOrder));
+        Assert.All(x.SigningBoundaries, b => Assert.False(string.IsNullOrWhiteSpace(b.SourcePath)));
+        Assert.Contains("MULTIPLE_SIGNING_PREFIXES_REQUIRE_REVIEW", x.Diagnostics);
+        Assert.Single(x.AppendixBoundaries);
+        Assert.All(x.Blocks.Skip(3).Take(2), b => Assert.Equal(PartyCandidateRegion.End, b.Region));
+        Assert.Equal(PartyCandidateRegion.Appendix, x.Blocks[5].Region);
+        Assert.True(x.RequiresReview);
+    }
+
+    [Fact]
     public void State_headings_must_not_be_misclassified_as_party()
     {
         var d = D(
