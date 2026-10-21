@@ -193,6 +193,17 @@ public sealed class PartyAppendixSourcePartitioner
             else if (b.Kind != "unclassified" || b.ModelId is not null)
                 return false;
         }
+        // A manifest can look internally consistent yet silently omit a parsed
+        // top-level paragraph/table. Require reverse coverage of both model lists.
+        var representedParagraphs = document.BodyBlocks.Where(b => b.Kind == "paragraph")
+            .Select(b => b.ModelId!).ToHashSet(StringComparer.Ordinal);
+        var representedTables = document.BodyBlocks.Where(b => b.Kind == "table")
+            .Select(b => b.ModelId!).ToHashSet(StringComparer.Ordinal);
+        if (representedParagraphs.Count != document.Paragraphs.Count
+            || document.Paragraphs.Any(p => !representedParagraphs.Contains(p.Id))
+            || representedTables.Count != document.Tables.Count
+            || document.Tables.Any(t => !representedTables.Contains(t.Id)))
+            return false;
         return true;
     }
 }
