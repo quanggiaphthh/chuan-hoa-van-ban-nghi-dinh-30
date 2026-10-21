@@ -1,5 +1,7 @@
 # V15 — Thẩm định trích xuất 12 quy tắc nguyên tử Hướng dẫn 05
 
+> **Lưu ý hiệu chỉnh V16 (19/10/2026):** Đặc tả V15 được giữ để truy vết lịch sử. Điều kiện `front_or_single` cho cả bốn lề trong V15 đã được chỉnh tại [APPLICABILITY-REVIEW-V16.md](./APPLICABILITY-REVIEW-V16.md): lề trên/dưới 20 mm áp dụng cả mặt sau in hai mặt; lề trái/phải phải phân biệt mặt sau 15/30 mm và cần bằng chứng duplex/parity. Kết luận V16 ưu tiên hơn diễn giải cũ ở mục 2–3 của V15. **Không có rule nào chuyển verified.**
+
 **Ngày:** 19/10/2026  
 **Nhánh:** `research/hd05-v15-atomic-candidates`, tách từ hồ sơ tài liệu PR #10.  
 **Quyết định:** `EXTRACTED_CANDIDATE_SCHEMA_PASS` · `INDEPENDENT_LEGAL_REVIEW_PENDING` · `RUNTIME_NO_GO` · `AUTO_FIX_NO_GO`.

@@ -27,9 +27,6 @@ applicability:
     - field: "document.page_orientation"
       operator: "equals"
       value: "portrait"
-    - field: "document.page_side"
-      operator: "equals"
-      value: "front_or_single"
 constraint:
   type: "equals"
   value: 20
@@ -40,8 +37,9 @@ autofix:
 requires_capability:
   - "confirmed_party_regime"
   - "verified_section_ownership"
-  - "page_side_and_orientation"
+  - "verified_page_orientation"
 extensions:
+  applicability_review_v16: "top_bottom_20mm_on_both_print_sides; portrait_only; layout_and_document_class_must_be_confirmed"
   semantic_role: "normal_page_section"
   legacy_candidate: "R22.01"
   evidence_status: "original_pdf_read_and_page_viewed"
