@@ -98,9 +98,10 @@ public sealed class PartyAppendixSourcePartitioner
             .Where(b => b.Region == PartyCandidateRegion.End)
             .Min(b => b.Source.Order);
         var lastAnchorOrder = firstEndOrder;
-        foreach (var anchor in anchors)
+        for (var anchorIndex = 0; anchorIndex < anchors.Count; anchorIndex++)
         {
-            if (anchor.Ordinal != (anchors.IndexOf(anchor) + 1)
+            var anchor = anchors[anchorIndex];
+            if (anchor.Ordinal != anchorIndex + 1
                 || anchor.SourceOrder <= lastAnchorOrder
                 || anchor.SourceOrder > blocks.Count)
                 return Refuse("APPENDIX_ANCHOR_ORDER_INVALID");
