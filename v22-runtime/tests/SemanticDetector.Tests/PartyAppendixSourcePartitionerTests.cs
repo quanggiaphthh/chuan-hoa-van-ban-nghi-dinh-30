@@ -164,4 +164,28 @@ public sealed class PartyAppendixSourcePartitionerTests
             e => e.Source.Order == 4);
         Assert.Equal("Nơi nhận:", string.Concat(d.Paragraphs[3].Runs.Select(r => r.Text)));
     }
+    [Fact]
+    public void Orphan_paragraph_in_model_is_rejected_even_when_manifest_looks_valid()
+    {
+        var d = TwoAppendices();
+        var orphan = d.Paragraphs[0] with { Id = "p999" };
+        var corrupted = d with { Paragraphs = d.Paragraphs.Append(orphan).ToArray() };
+        var x = new PartyAppendixSourcePartitioner().Project(corrupted);
+        Assert.False(x.SourcePartitionComplete);
+        Assert.Empty(x.Appendices);
+        Assert.Contains("APPENDIX_SOURCE_MANIFEST_UNVERIFIED", x.Diagnostics);
+    }
+
+    [Fact]
+    public void Orphan_table_in_model_is_rejected_even_when_manifest_looks_valid()
+    {
+        var d = TwoAppendices();
+        var orphan = d.Tables[0] with { Id = "t999" };
+        var corrupted = d with { Tables = d.Tables.Append(orphan).ToArray() };
+        var x = new PartyAppendixSourcePartitioner().Project(corrupted);
+        Assert.False(x.SourcePartitionComplete);
+        Assert.Empty(x.Appendices);
+        Assert.Contains("APPENDIX_SOURCE_MANIFEST_UNVERIFIED", x.Diagnostics);
+    }
+
 }
