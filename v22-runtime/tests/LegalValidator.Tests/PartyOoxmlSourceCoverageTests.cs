@@ -13,7 +13,7 @@ namespace Nd30.LegalValidator.Tests;
 
 public sealed class PartyOoxmlSourceCoverageTests
 {
-    private static string Create(params W.OpenXmlElement[] elements)
+    private static string Create(params OpenXmlElement[] elements)
     {
         var path = Path.Combine(Path.GetTempPath(), $"hd05-v25-{Guid.NewGuid():N}.docx");
         using (var package = WordprocessingDocument.Create(path, WordprocessingDocumentType.Document))
