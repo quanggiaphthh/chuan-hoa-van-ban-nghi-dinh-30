@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           git merge-base --is-ancestor f55d82be4657f9da6bee594325d2cccb26c995ff HEAD
-          git diff --check f55d82be4657f9da6bee594325d2cccb26c995ff..HEAD
+          git diff --check a16a47fb38f3c542554befa1773a1b9fb6d044be..HEAD
           dotnet --info
           python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
       - name: Regenerate and require zero source drift
