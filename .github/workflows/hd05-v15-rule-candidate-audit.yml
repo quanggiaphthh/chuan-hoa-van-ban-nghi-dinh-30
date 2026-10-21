@@ -1,0 +1,28 @@
+name: HD05 V15 extracted rule audit
+
+on:
+  push:
+    branches:
+      - research/hd05-v15-atomic-candidates
+  pull_request:
+    paths:
+      - 'huong-dan-05/candidates-v15/**'
+      - 'schemas/rule.schema.json'
+      - '.github/workflows/hd05-v15-rule-candidate-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-extracted-candidates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install standard schema validation dependencies
+        run: python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3 jsonschema==4.25.1
+      - name: Confirm candidate schema, values, and runtime isolation
+        run: python huong-dan-05/candidates-v15/verify_candidates.py

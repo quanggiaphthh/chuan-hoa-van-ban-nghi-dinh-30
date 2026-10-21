@@ -1,0 +1,53 @@
+# EXTRACTED CANDIDATE, NOT A VERIFIED RUNTIME RULE. NEVER IMPORT INTO release/.
+schema_version: "1.0"
+id: "PARTY.HD05.2026.PARTII.IV.4.1.1.MARGIN_TOP"
+regime: "party"
+domain: "document_format"
+source:
+  source_id: "VN-PARTY-HD05-2026"
+  locator:
+    section: "II.IV.4.1.1"
+    pdf_page: 28
+normativity: "guidance"
+maturity: "extracted"
+temporality:
+  effective_from: "2026-05-27"
+  effective_to: null
+target:
+  object_type: "section"
+  property: "margin_top_mm"
+applicability:
+  all:
+    - field: "regime.value"
+      operator: "equals"
+      value: "party"
+    - field: "document.class"
+      operator: "equals"
+      value: "official_party_document"
+    - field: "document.page_orientation"
+      operator: "equals"
+      value: "portrait"
+    - field: "document.page_side"
+      operator: "equals"
+      value: "front_or_single"
+constraint:
+  type: "equals"
+  value: 20
+validation:
+  severity: "LEGAL_WARNING"
+autofix:
+  policy: "PROHIBITED"
+requires_capability:
+  - "confirmed_party_regime"
+  - "verified_section_ownership"
+  - "page_side_and_orientation"
+extensions:
+  semantic_role: "normal_page_section"
+  legacy_candidate: "R22.01"
+  evidence_status: "original_pdf_read_and_page_viewed"
+  confirmation_state: "NEEDS_INDEPENDENT_LEGAL_REVIEW"
+  implementation_status: "NOT_IN_RUNTIME"
+  label_vi: "Lề trên trang dọc mặt đầu hoặc in một mặt"
+  evidence_pdf: "https://tulieuvankien.dangcongsan.vn/upload/2006988/20260529/HD_05_VPTW_e1550.pdf"
+  source_pdf_page: 28
+  confidence_note: "Exact value sourced; technical role/applicability/observability require independent review."
