@@ -1,0 +1,32 @@
+name: HD05 V26 read-only appendix source partition
+
+on:
+  push:
+    branches:
+      - feature/hd05-v26-appendix-source-partition
+  pull_request:
+    paths:
+      - 'v22-runtime/src/SemanticDetector/Detection/PartyAppendixSourcePartitioner.cs'
+      - 'v22-runtime/tests/SemanticDetector.Tests/PartyAppendixSourcePartitionerTests.cs'
+      - '.github/workflows/hd05-v26-appendix-source-partition.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  appendix-source-partition:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore v22-runtime/DocumentEngine.slnx
+      - name: Build
+        run: dotnet build v22-runtime/DocumentEngine.slnx --no-restore -c Release
+      - name: Focused V26 source partition tests
+        run: dotnet test v22-runtime/tests/SemanticDetector.Tests/SemanticDetector.Tests.csproj --no-build -c Release --filter FullyQualifiedName~PartyAppendixSourcePartitionerTests
+      - name: Full .NET regression
+        run: dotnet test v22-runtime/DocumentEngine.slnx --no-build -c Release
