@@ -2,7 +2,7 @@ name: Document Processor .NET 10 Verification
 
 on:
   push:
-    branches: [codex/processor-canonical-20261002]
+    branches: [codex/processor-canonical-20261002, feature/hd05-v26-appendix-source-partition]
   workflow_dispatch:
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           git merge-base --is-ancestor f55d82be4657f9da6bee594325d2cccb26c995ff HEAD
-          git diff --check f55d82be4657f9da6bee594325d2cccb26c995ff..HEAD
+          git diff --check 89b712ecb9d08d50eb652eebc73bb1159f203b77..HEAD
           dotnet --info
           python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.3
       - name: Regenerate and require zero source drift
