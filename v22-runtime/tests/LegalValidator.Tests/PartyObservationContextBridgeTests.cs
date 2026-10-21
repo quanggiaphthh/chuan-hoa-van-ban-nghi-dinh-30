@@ -300,4 +300,161 @@ public sealed class PartyObservationContextBridgeTests
         }
         finally { File.Delete(file); }
     }
+
+    [Fact]
+    public void V23_legacy_bridge_rejects_self_consistent_foreign_document_paragraph()
+    {
+        var a = CreateDocx();
+        var b = CreateDocx();
+        try
+        {
+            var docA = Parsed(a);
+            var docB = Parsed(b);
+            var paragraphB = Assert.Single(docB.Paragraphs);
+            var context = PartyObservationContextBridge.Create(docA, new DateOnly(2026, 10, 21));
+            var result = PartyObservationContextBridge.ProjectRun(
+                context, docB, paragraphB, "crossdoc",
+                Ids(paragraphB), ObservedRunProperty.FontSizePt);
+            Assert.Equal(ValidationStatus.NOT_EVALUATED, result.Status);
+            Assert.Equal("DOCUMENT_SESSION_MISMATCH", result.Reason);
+            Assert.Empty(context.ObservedValues);
+            Assert.Empty(context.Evidence);
+            Assert.Equal(PatchPolicy.PROHIBITED, context.DocumentPatchPolicy);
+        }
+        finally { File.Delete(a); File.Delete(b); }
+    }
+
+    [Fact]
+    public void V23_legacy_bridge_rejects_self_consistent_foreign_section()
+    {
+        var a = CreateDocx();
+        var b = CreateDocx();
+        try
+        {
+            var docA = Parsed(a);
+            var docB = Parsed(b);
+            var context = PartyObservationContextBridge.Create(docA, new DateOnly(2026, 10, 21));
+            var result = PartyObservationContextBridge.ProjectMargins(
+                context, docB, Assert.Single(docB.Sections), "crosssection",
+                new MarginTarget(20, 20, 30, 15),
+                new MarginPrintEvidence(DeclaredPrintSurface.SingleSided, true, true, true));
+            Assert.Equal(ValidationStatus.NOT_EVALUATED, result.Status);
+            Assert.Equal("DOCUMENT_SESSION_MISMATCH", result.Reason);
+            Assert.Empty(context.ObservedValues);
+            Assert.Empty(context.Evidence);
+        }
+        finally { File.Delete(a); File.Delete(b); }
+    }
+
+    [Fact]
+    public void V23_unbound_context_cannot_create_observations()
+    {
+        var file = CreateDocx();
+        try
+        {
+            var doc = Parsed(file);
+            var paragraph = Assert.Single(doc.Paragraphs);
+            var context = new ValidationContext();
+            var result = PartyObservationContextBridge.ProjectRun(
+                context, doc, paragraph, "unbound",
+                Ids(paragraph), ObservedRunProperty.FontSizePt);
+            Assert.Equal(ValidationStatus.NOT_EVALUATED, result.Status);
+            Assert.Equal("DOCUMENT_SESSION_MISMATCH", result.Reason);
+            Assert.Empty(context.ObservedValues);
+            Assert.Equal(PatchPolicy.PROHIBITED, context.DocumentPatchPolicy);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void V23_reparse_same_file_is_different_document_instance()
+    {
+        var file = CreateDocx();
+        try
+        {
+            var a = Parsed(file);
+            var b = Parsed(file);
+            var p = Assert.Single(b.Paragraphs);
+            var context = PartyObservationContextBridge.Create(a, new DateOnly(2026, 10, 21));
+            var result = PartyObservationContextBridge.ProjectRun(
+                context, b, p, "reparsed", Ids(p), ObservedRunProperty.FontSizePt);
+            Assert.Equal(ValidationStatus.NOT_EVALUATED, result.Status);
+            Assert.Equal("DOCUMENT_SESSION_MISMATCH", result.Reason);
+            Assert.Empty(context.Evidence);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void V23_session_rejects_foreign_paragraph_and_section()
+    {
+        var a = CreateDocx();
+        var b = CreateDocx();
+        try
+        {
+            var session = PartyEvidenceSession.Open(Parsed(a), new DateOnly(2026, 10, 21));
+            var foreign = Parsed(b);
+            var paragraph = Assert.Single(foreign.Paragraphs);
+            var run = session.ObserveRun(
+                paragraph, "foreignrun", Ids(paragraph), ObservedRunProperty.Bold);
+            var margin = session.ObserveMargins(
+                Assert.Single(foreign.Sections), "foreignmargin",
+                new MarginTarget(20, 20, 30, 15),
+                new MarginPrintEvidence(DeclaredPrintSurface.SingleSided, true, true, true));
+            Assert.Equal(ValidationStatus.NOT_EVALUATED, run.Status);
+            Assert.Equal(ValidationStatus.NOT_EVALUATED, margin.Status);
+            Assert.Empty(session.Snapshot().ObservedTargetKeys);
+            Assert.Equal(0, session.Snapshot().EvidenceRecordCount);
+        }
+        finally { File.Delete(a); File.Delete(b); }
+    }
+
+    [Fact]
+    public void V23_session_own_document_is_review_only_and_snapshot_is_stable()
+    {
+        var file = CreateDocx();
+        try
+        {
+            var doc = Parsed(file);
+            var p = Assert.Single(doc.Paragraphs);
+            var session = PartyEvidenceSession.Open(doc, new DateOnly(2026, 10, 21));
+            var before = session.Snapshot();
+            var observation = session.ObserveRun(
+                p, "ownrun", Ids(p), ObservedRunProperty.FontSizePt);
+            var after = session.Snapshot();
+            Assert.Equal(ValidationStatus.NEEDS_REVIEW, observation.Status);
+            Assert.Empty(before.ObservedTargetKeys);
+            Assert.Single(after.ObservedTargetKeys);
+            Assert.Equal(1, after.EvidenceRecordCount);
+            Assert.Equal(PatchPolicy.PROHIBITED, after.DocumentPatchPolicy);
+            Assert.True(after.RequiresHumanReview);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void V23_session_duplicate_concurrent_observations_do_not_overwrite()
+    {
+        var file = CreateDocx();
+        try
+        {
+            var doc = Parsed(file);
+            var p = Assert.Single(doc.Paragraphs);
+            var ids = Ids(p);
+            var session = PartyEvidenceSession.Open(doc, new DateOnly(2026, 10, 21));
+            var statuses = new ValidationStatus[12];
+            Parallel.For(0, statuses.Length, i =>
+            {
+                statuses[i] = session.ObserveRun(
+                    p, "same", ids, ObservedRunProperty.FontSizePt).Status;
+            });
+            Assert.Equal(1, statuses.Count(s => s == ValidationStatus.NEEDS_REVIEW));
+            Assert.Equal(11, statuses.Count(s => s == ValidationStatus.NOT_EVALUATED));
+            var snapshot = session.Snapshot();
+            Assert.Single(snapshot.ObservedTargetKeys);
+            Assert.Equal(1, snapshot.EvidenceRecordCount);
+            Assert.Equal(12, snapshot.Results.Count);
+        }
+        finally { File.Delete(file); }
+    }
 }

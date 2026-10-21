@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Nd30.DocumentEngine.Formatting;
 using Nd30.DocumentEngine.Model;
@@ -25,17 +26,21 @@ public static class PartyObservationContextBridge
     private static readonly Regex CandidateId = new(
         "^[a-z][a-z0-9_-]{0,63}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private const string EvidenceKind = "party_docx_derived_observation_unverified";
+    // Ephemeral one-document binding: does not retain a disposed context.
+    private static readonly ConditionalWeakTable<ValidationContext, DocumentModel> BoundDocuments = new();
 
     public static ValidationContext Create(DocumentModel document, DateOnly evaluationDate)
     {
         ArgumentNullException.ThrowIfNull(document);
         // More conservative than the input package: Party candidate observations
         // must never turn into an eligible document mutation.
-        return new ValidationContext
+        var context = new ValidationContext
         {
             EvaluationDate = evaluationDate,
             DocumentPatchPolicy = PatchPolicy.PROHIBITED
         };
+        BoundDocuments.Add(context, document);
+        return context;
     }
 
     public static PartyCandidateObservation ProjectRun(
@@ -59,6 +64,12 @@ public static class PartyObservationContextBridge
         };
         var key = Key(candidateId, suffix);
         context.DocumentPatchPolicy = PatchPolicy.PROHIBITED;
+
+        // Both the context and this document must originate from the same Create call.
+        // Do not trust self-consistent (foreign document, foreign child) pairs.
+        if (!BoundDocuments.TryGetValue(context, out var owner)
+            || !ReferenceEquals(owner, document))
+            return new(key, ValidationStatus.NOT_EVALUATED, "DOCUMENT_SESSION_MISMATCH");
 
         if (context.ObservedValues.ContainsKey(key) || context.UncertainTargets.Contains(key))
             return new(key, ValidationStatus.NOT_EVALUATED, "DUPLICATE_CANDIDATE_TARGET");
@@ -106,6 +117,12 @@ public static class PartyObservationContextBridge
         ArgumentNullException.ThrowIfNull(printEvidence);
         var key = Key(candidateId, "margins_mm");
         context.DocumentPatchPolicy = PatchPolicy.PROHIBITED;
+
+        // Both the context and this document must originate from the same Create call.
+        // Do not trust self-consistent (foreign document, foreign child) pairs.
+        if (!BoundDocuments.TryGetValue(context, out var owner)
+            || !ReferenceEquals(owner, document))
+            return new(key, ValidationStatus.NOT_EVALUATED, "DOCUMENT_SESSION_MISMATCH");
 
         if (context.ObservedValues.ContainsKey(key) || context.UncertainTargets.Contains(key))
             return new(key, ValidationStatus.NOT_EVALUATED, "DUPLICATE_CANDIDATE_TARGET");
