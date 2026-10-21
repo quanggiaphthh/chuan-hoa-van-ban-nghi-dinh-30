@@ -106,7 +106,8 @@ public sealed class DocxParser {
    if (main.WordprocessingCommentsPart is not null) readOnlyParts.Add("comments");
    var model = new DocumentModel("doc", paragraphs, tables, sections, headers, footers, Numbering(main), Styles(main), relationships, safety, readOnlyParts)
    {
-    BodyBlocks = bodyBlocks.AsReadOnly()
+    BodyBlocks = bodyBlocks.AsReadOnly(),
+    SourceSha256 = snapshot.Sha256
    };
    cancellationToken.ThrowIfCancellationRequested();
    snapshot.EnsureUnchanged();
