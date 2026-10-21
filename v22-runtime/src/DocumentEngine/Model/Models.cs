@@ -34,6 +34,8 @@ public sealed record DocumentModel(string Id,IReadOnlyList<ParagraphModel> Parag
 {
     // Additive contract: legacy consumers can continue using Paragraphs/Tables and positional construction.
     public IReadOnlyList<BodyBlockReference> BodyBlocks { get; init; } = [];
+    // SHA-256 of the exact preflighted package used by DocxParser; absent for hand-built models.
+    public string? SourceSha256 { get; init; }
 }
 public sealed record EffectiveProperty<T>(T? Value,string Provenance);
 public sealed record EffectiveFormatting(EffectiveProperty<string> FontFamily,EffectiveProperty<double?> FontSizePt,EffectiveProperty<bool?> Bold,EffectiveProperty<bool?> Italic,EffectiveProperty<bool?> Underline,EffectiveProperty<string> Color,EffectiveProperty<string> Alignment,EffectiveProperty<LineSpacingModel> LineSpacing,EffectiveProperty<double?> SpaceBeforePt,EffectiveProperty<double?> SpaceAfterPt,EffectiveProperty<double?> FirstLineIndentPt,EffectiveProperty<double?> LeftIndentPt,EffectiveProperty<double?> RightIndentPt);

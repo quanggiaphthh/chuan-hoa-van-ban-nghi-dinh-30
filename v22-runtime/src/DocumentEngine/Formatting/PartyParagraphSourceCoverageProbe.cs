@@ -48,6 +48,12 @@ public sealed class PartyParagraphSourceCoverageProbe
             $"/w:document/w:body/*[{source.Order}]")
             return Unknown("SOURCE_BLOCK_PATH_NOT_CONFIRMED");
 
+        // A correct-looking paragraph from a DIFFERENT DOCX cannot certify this model.
+        // Bind the parser model to the preflighted package identity before reading XML.
+        if (string.IsNullOrEmpty(document.SourceSha256)
+            || !string.Equals(document.SourceSha256, snapshot.Sha256, StringComparison.Ordinal))
+            return Unknown("SOURCE_SNAPSHOT_DOCUMENT_MISMATCH");
+
         try
         {
             snapshot.EnsureUnchanged();

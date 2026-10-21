@@ -191,4 +191,68 @@ public sealed class PartyOoxmlSourceCoverageTests
         }
         finally { File.Delete(path); }
     }
+    [Fact]
+    public void Identical_text_but_different_source_docx_cannot_certify_foreign_model()
+    {
+        var a = Create(TextRun("A"));
+        var b = Create(new W.Run(
+            new W.RunProperties(new W.FontSize { Val = "36" }), new W.Text("A")));
+        try
+        {
+            var (snapshotA, modelA) = ParseFile(a);
+            var (snapshotB, modelB) = ParseFile(b);
+            using (snapshotA)
+            using (snapshotB)
+            {
+                Assert.NotEqual(snapshotA.Sha256, snapshotB.Sha256);
+                Assert.NotEqual(modelA.SourceSha256, modelB.SourceSha256);
+                Assert.Equal("A", Assert.Single(modelA.Paragraphs[0].Runs).Text);
+                Assert.Equal("A", Assert.Single(modelB.Paragraphs[0].Runs).Text);
+
+                var result = new PartyParagraphSourceCoverageProbe().Observe(
+                    snapshotB, modelA, modelA.BodyBlocks[0], modelA.Paragraphs[0]);
+                Assert.Equal(ObservationOutcome.NotEvaluated, result.Outcome);
+                Assert.Equal("SOURCE_SNAPSHOT_DOCUMENT_MISMATCH", result.Reason);
+
+                var ledger = PartySourceScopedEvidenceSession.Open(
+                    modelA, new DateOnly(2026, 10, 21));
+                var observed = ledger.ObserveSourceCoveredWholeBodyParagraph(
+                    snapshotB, "crossfile", modelA.BodyBlocks[0], modelA.Paragraphs[0],
+                    ObservedRunProperty.FontSizePt);
+                Assert.Equal(ValidationStatus.NOT_EVALUATED, observed.Status);
+                Assert.Equal("SOURCE_SNAPSHOT_DOCUMENT_MISMATCH", observed.Reason);
+                Assert.Equal(0, ledger.Snapshot().EvidenceRecordCount);
+                Assert.Empty(ledger.Snapshot().ObservedTargetKeys);
+            }
+        }
+        finally { File.Delete(a); File.Delete(b); }
+    }
+
+    [Fact]
+    public void Model_without_parsed_package_fingerprint_is_not_certified()
+    {
+        var file = Create(TextRun("A"));
+        try
+        {
+            var (snapshot, model) = ParseFile(file);
+            using (snapshot)
+            {
+                Assert.Equal(snapshot.Sha256, model.SourceSha256);
+                var missing = model with { SourceSha256 = null };
+                var result = new PartyParagraphSourceCoverageProbe().Observe(
+                    snapshot, missing, missing.BodyBlocks[0], missing.Paragraphs[0]);
+                Assert.Equal(ObservationOutcome.NotEvaluated, result.Outcome);
+                Assert.Equal("SOURCE_SNAPSHOT_DOCUMENT_MISMATCH", result.Reason);
+                var session = PartySourceScopedEvidenceSession.Open(
+                    missing, new DateOnly(2026, 10, 21));
+                var denied = session.ObserveSourceCoveredWholeBodyParagraph(
+                    snapshot, "missinghash", missing.BodyBlocks[0],
+                    missing.Paragraphs[0], ObservedRunProperty.FontSizePt);
+                Assert.Equal(ValidationStatus.NOT_EVALUATED, denied.Status);
+                Assert.Equal(0, session.Snapshot().EvidenceRecordCount);
+            }
+        }
+        finally { File.Delete(file); }
+    }
+
 }
