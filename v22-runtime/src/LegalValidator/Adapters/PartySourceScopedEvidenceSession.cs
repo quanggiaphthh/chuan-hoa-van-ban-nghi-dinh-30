@@ -91,6 +91,52 @@ public sealed class PartySourceScopedEvidenceSession
         }
     }
 
+    /// <summary>
+    /// V25 opt-in strict source-coverage path: inspect the preflighted original
+    /// OOXML before making any derived observation. Unknown inline structures
+    /// cannot enter the uncertain-value evidence ledger.
+    /// </summary>
+    public PartyScopedEvidenceObservation ObserveSourceCoveredWholeBodyParagraph(
+        Nd30.DocumentEngine.Safety.SafeDocxSnapshot snapshot,
+        string candidateId, BodyBlockReference source, ParagraphModel paragraph,
+        ObservedRunProperty property)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(paragraph);
+        lock (_gate)
+        {
+            // Reuse the V24 public validation path for candidate ID syntax.
+            // Do not store any observation on invalid input.
+            if (candidateId is null || !CandidateId.IsMatch(candidateId))
+                throw new ArgumentException("Invalid lower-case candidate ID.", nameof(candidateId));
+
+            // Do not trust a matching source path unless the original object
+            // and the complete ordered manifest remain owned by this session.
+            if (!ValidManifest()
+                || !_sourceAtOpen.Any(b => ReferenceEquals(b, source)))
+            {
+                var denied = new PartyScopedEvidenceObservation(
+                    candidateId, source.Order, source.SourcePart, source.SourcePath,
+                    source.ModelId, "", ValidationStatus.NOT_EVALUATED,
+                    "SOURCE_BLOCK_MANIFEST_UNVERIFIED");
+                _history.Add(denied);
+                return denied;
+            }
+            var coverage = new PartyParagraphSourceCoverageProbe().Observe(
+                snapshot, _document, source, paragraph);
+            if (coverage.Outcome != ObservationOutcome.Consistent)
+            {
+                var denied = new PartyScopedEvidenceObservation(
+                    candidateId, source.Order, source.SourcePart, source.SourcePath,
+                    source.ModelId, "", ValidationStatus.NOT_EVALUATED, coverage.Reason);
+                _history.Add(denied);
+                return denied;
+            }
+            return ObserveWholeBodyParagraph(candidateId, source, paragraph, property);
+        }
+    }
+
     public PartyScopedEvidenceSnapshot Snapshot()
     {
         lock (_gate)
