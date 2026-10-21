@@ -37,18 +37,34 @@ public sealed class DocxParser {
    var main = document.MainDocumentPart ?? throw new InvalidDataException();
    var body = main.Document.Body ?? throw new InvalidDataException();
    var paragraphs = new List<ParagraphModel>();
-   var paragraphIndex = 0;
-   foreach (var paragraph in body.Elements<W.Paragraph>())
-   {
-    cancellationToken.ThrowIfCancellationRequested();
-    paragraphs.Add(P(paragraph, $"p{++paragraphIndex}"));
-   }
    var tables = new List<TableModel>();
+   var bodyBlocks = new List<BodyBlockReference>();
+   var paragraphIndex = 0;
    var tableIndex = 0;
-   foreach (var table in body.Elements<W.Table>())
+   var sourceIndex = 0;
+   // Preserve the original direct-child order. Existing paragraph/table IDs and collections stay stable.
+   foreach (var child in body.ChildElements)
    {
     cancellationToken.ThrowIfCancellationRequested();
-    tables.Add(T(table, $"t{++tableIndex}"));
+    sourceIndex++;
+    var sourcePath = $"/w:document/w:body/*[{sourceIndex}]";
+    if (child is W.Paragraph paragraph)
+    {
+     var id = $"p{++paragraphIndex}";
+     paragraphs.Add(P(paragraph, id));
+     bodyBlocks.Add(new BodyBlockReference(bodyBlocks.Count + 1, "paragraph", id, "word/document.xml", sourcePath, child.LocalName));
+    }
+    else if (child is W.Table table)
+    {
+     var id = $"t{++tableIndex}";
+     tables.Add(T(table, id));
+     bodyBlocks.Add(new BodyBlockReference(bodyBlocks.Count + 1, "table", id, "word/document.xml", sourcePath, child.LocalName));
+    }
+    else if (child is not W.SectionProperties)
+    {
+     // Do not pretend an SDT, altChunk or other unsupported container has been parsed.
+     bodyBlocks.Add(new BodyBlockReference(bodyBlocks.Count + 1, "unclassified", null, "word/document.xml", sourcePath, child.LocalName));
+    }
    }
    cancellationToken.ThrowIfCancellationRequested();
    var sections = Sections(main);
@@ -88,7 +104,10 @@ public sealed class DocxParser {
    if (main.FootnotesPart is not null) readOnlyParts.Add("footnotes");
    if (main.EndnotesPart is not null) readOnlyParts.Add("endnotes");
    if (main.WordprocessingCommentsPart is not null) readOnlyParts.Add("comments");
-   var model = new DocumentModel("doc", paragraphs, tables, sections, headers, footers, Numbering(main), Styles(main), relationships, safety, readOnlyParts);
+   var model = new DocumentModel("doc", paragraphs, tables, sections, headers, footers, Numbering(main), Styles(main), relationships, safety, readOnlyParts)
+   {
+    BodyBlocks = bodyBlocks.AsReadOnly()
+   };
    cancellationToken.ThrowIfCancellationRequested();
    snapshot.EnsureUnchanged();
    return new(model, diagnostics);

@@ -1,0 +1,43 @@
+name: HD05 P0-A fail-closed regime routing
+
+on:
+  push:
+    branches:
+      - feature/hd05-p0a-fail-closed-regime-router
+  pull_request:
+    paths:
+      - 'v22-runtime/src/LegalValidator/Catalog/**'
+      - 'v22-runtime/tests/LegalValidator.Tests/**'
+      - '.github/workflows/hd05-p0a-regime-routing.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hd05-p0a-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  regime-routing-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore v22-runtime/DocumentEngine.slnx
+      - name: Build
+        run: dotnet build v22-runtime/DocumentEngine.slnx --no-restore -c Release
+      - name: Focused P0-A routing tests
+        run: dotnet test v22-runtime/tests/LegalValidator.Tests/LegalValidator.Tests.csproj --no-build -c Release --filter FullyQualifiedName~RegimeCatalogRoutingTests --logger "trx;LogFileName=p0a.trx"
+      - name: Full solution regression
+        run: dotnet test v22-runtime/DocumentEngine.slnx --no-build -c Release --logger "trx;LogFileName=p0a-regression.trx"
+      - name: Save test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hd05-p0a-dotnet-evidence
+          path: v22-runtime/tests/*/TestResults/*.trx
+          if-no-files-found: warn

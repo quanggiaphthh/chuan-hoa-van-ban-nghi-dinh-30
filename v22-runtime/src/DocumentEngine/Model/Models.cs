@@ -28,7 +28,13 @@ public sealed record AbstractNumberingModel(string Id,IReadOnlyList<NumberingLev
 public sealed record NumberingModel(string Id,string? AbstractNumberId);
 public sealed record NumberingCatalogModel(IReadOnlyList<AbstractNumberingModel> AbstractNumbers,IReadOnlyList<NumberingModel> Instances);
 public sealed record SectionModel(string Id,int Index,uint? PageWidthTwips,uint? PageHeightTwips,string Orientation,int? MarginTopTwips,int? MarginRightTwips,int? MarginBottomTwips,int? MarginLeftTwips,IReadOnlyList<HeaderFooterReferenceModel> HeaderReferences,IReadOnlyList<HeaderFooterReferenceModel> FooterReferences,string? PageNumberFormat,int? PageNumberStart,string BoundaryParagraphId);
-public sealed record DocumentModel(string Id,IReadOnlyList<ParagraphModel> Paragraphs,IReadOnlyList<TableModel> Tables,IReadOnlyList<SectionModel> Sections,IReadOnlyList<HeaderModel> Headers,IReadOnlyList<FooterModel> Footers,NumberingCatalogModel Numbering,StyleCatalogModel Styles,IReadOnlyList<RelationshipModel> Relationships,PackageSafetyState Safety,IReadOnlyList<string> ReadOnlyParts);
+// Source-level body children; an unclassified child is evidence, not a parsed/mutable block.
+public sealed record BodyBlockReference(int Order,string Kind,string? ModelId,string SourcePart,string SourcePath,string ElementName);
+public sealed record DocumentModel(string Id,IReadOnlyList<ParagraphModel> Paragraphs,IReadOnlyList<TableModel> Tables,IReadOnlyList<SectionModel> Sections,IReadOnlyList<HeaderModel> Headers,IReadOnlyList<FooterModel> Footers,NumberingCatalogModel Numbering,StyleCatalogModel Styles,IReadOnlyList<RelationshipModel> Relationships,PackageSafetyState Safety,IReadOnlyList<string> ReadOnlyParts)
+{
+    // Additive contract: legacy consumers can continue using Paragraphs/Tables and positional construction.
+    public IReadOnlyList<BodyBlockReference> BodyBlocks { get; init; } = [];
+}
 public sealed record EffectiveProperty<T>(T? Value,string Provenance);
 public sealed record EffectiveFormatting(EffectiveProperty<string> FontFamily,EffectiveProperty<double?> FontSizePt,EffectiveProperty<bool?> Bold,EffectiveProperty<bool?> Italic,EffectiveProperty<bool?> Underline,EffectiveProperty<string> Color,EffectiveProperty<string> Alignment,EffectiveProperty<LineSpacingModel> LineSpacing,EffectiveProperty<double?> SpaceBeforePt,EffectiveProperty<double?> SpaceAfterPt,EffectiveProperty<double?> FirstLineIndentPt,EffectiveProperty<double?> LeftIndentPt,EffectiveProperty<double?> RightIndentPt);
 public sealed record ParseResult(DocumentModel? Document,IReadOnlyList<Diagnostic> Diagnostics);
