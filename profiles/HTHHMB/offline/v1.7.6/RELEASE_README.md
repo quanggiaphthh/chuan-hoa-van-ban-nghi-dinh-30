@@ -1,16 +1,16 @@
 # HTHHMB — Quy tắc offline NĐ30/HD05 v1.7.6
 
-**Phạm vi của bản commit GitHub:** bản xuất **dữ liệu văn bản có thể đọc độc lập** (CSV/Markdown/JSON và script QA), lưu theo phiên bản, không chỉnh sửa các rule packs và profile cũ của repository.
+**Phạm vi bản commit GitHub:** dữ liệu offline dạng **Excel nguyên bản + CSV/Markdown/JSON và script QA**, lưu theo phiên bản, không chỉnh sửa các rule packs và profile cũ của repository.
 
-> **Lưu ý về gói nhị phân:** `BO_RULE_PROFILE_HTHHMB_v1.7.6_OFFLINE_FULL.xlsx` và `BO_RULE_OFFLINE_HTHHMB_v1.7.6_FULL.zip` được kiểm tra tại nơi tạo nhưng **không có trong commit này** vì kết nối GitHub phiên hiện tại không hỗ trợ chuyển bytes trực tiếp từ tệp cục bộ. Không coi các tệp đã có trên GitHub; SHA-256 bên dưới chỉ là danh tính của bản gốc.
+> **Trạng thái tệp nhị phân:** [`BO_RULE_PROFILE_HTHHMB_v1.7.6_OFFLINE_FULL.xlsx`](BO_RULE_PROFILE_HTHHMB_v1.7.6_OFFLINE_FULL.xlsx) **đã được commit nguyên bytes, kiểm tra Git blob SHA**. File `BO_RULE_OFFLINE_HTHHMB_v1.7.6_FULL.zip` hiện **chưa có trên GitHub**; checksum phía dưới chỉ dùng đối chiếu bản gốc từ cuộc hội thoại. ZIP chứa nguồn v1.7.4/v1.7.5 và các bản Markdown mở rộng.
 
 ## Bắt đầu
 
 1. Đọc [READ_FIRST.md](READ_FIRST.md) để chọn đúng hệ NĐ30/HD05, điều kiện và ngoại lệ.
-2. [RULE_ALL_ATTRIBUTES.csv](RULE_ALL_ATTRIBUTES.csv) là 868 thuộc tính bổ sung của C/N/G/X; phần D (434 trường con) được kế thừa trong workbook gốc và gói offline, **chưa được xuất riêng trên GitHub**.
+2. [RULE_ALL_ATTRIBUTES.csv](RULE_ALL_ATTRIBUTES.csv) là 868 thuộc tính bổ sung của C/N/G/X; phần D (434 trường con) nằm trong [workbook Excel](BO_RULE_PROFILE_HTHHMB_v1.7.6_OFFLINE_FULL.xlsx).
 3. [MA_TRAN_165.csv](MA_TRAN_165.csv) kiểm kê 165 trường cha; [AUDIT_BANG_132.csv](AUDIT_BANG_132.csv) đối chiếu 132 trường con bảng.
 4. Đọc [BLOCKERS.md](BLOCKERS.md), [QA_CHECKLIST.md](QA_CHECKLIST.md), [TQA_NR.md](TQA_NR.md) trước khi kết luận tuân thủ.
-5. [manifest.json](manifest.json) là manifest gốc của ZIP đầy đủ, **không phải kê khai rằng mọi file trong ZIP đã được commit ở đây**.
+5. [manifest.json](manifest.json) là manifest gốc của ZIP đầy đủ; bản CSV và XLSX đã có trên GitHub nhưng không nên hiểu rằng mọi file trong ZIP đã được commit ở dạng tách rời.
 
 ## Trạng thái
 
