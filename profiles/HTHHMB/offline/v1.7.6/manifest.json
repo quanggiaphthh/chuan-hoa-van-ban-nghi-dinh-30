@@ -1,0 +1,69 @@
+{
+  "version": "1.7.6",
+  "created_on": "2026-10-29",
+  "source_workbook": "BO_RULE_PROFILE_HTHHMB_v1.7.5_TACH_SAU_PHAN_DAU.xlsx",
+  "source_sha256": "c1862dc733a11dfbea5a403b4221fa0e79d5fb99b9df40fe8e79bba68ccfa9a3",
+  "output_workbook": "BO_RULE_PROFILE_HTHHMB_v1.7.6_OFFLINE_FULL.xlsx",
+  "output_sha256": "5aa663404b5e211fc23ba2cac7b74e21b7bf314e80fc223862d966183e4fc186",
+  "legacy_sheet_count": 26,
+  "sheet_count": 41,
+  "new_sheet_names": [
+    "RULE_N_ND30",
+    "RULE_C_ND30",
+    "RULE_G_ND30",
+    "RULE_X_ND30",
+    "RULE_N_HD05",
+    "RULE_C_HD05",
+    "RULE_G_HD05",
+    "RULE_X_HD05",
+    "AUDIT_BANG_132",
+    "MA_TRAN_165",
+    "BLOCKERS_176",
+    "TQA_NR_176",
+    "TEST_CASES_176",
+    "README_V176",
+    "CHANGE_V176"
+  ],
+  "parent_codes": 165,
+  "table_rules": 132,
+  "D_rule_count_prior": 434,
+  "new_CNGX_rule_count": 868,
+  "new_counts": {
+    "RULE_N_ND30": 228,
+    "RULE_N_HD05": 228,
+    "RULE_C_ND30": 112,
+    "RULE_C_HD05": 116,
+    "RULE_G_ND30": 37,
+    "RULE_G_HD05": 41,
+    "RULE_X_ND30": 50,
+    "RULE_X_HD05": 56
+  },
+  "formula_xml_elements_source": 4372,
+  "formula_xml_elements_output": 4372,
+  "duplicate_table_codes": 0,
+  "blocker_count": 14,
+  "logic_test_count": 15,
+  "tqa_gates": 6,
+  "official_sources": {
+    "ND30": "https://congbao.chinhphu.vn/van-ban/nghi-dinh-so-30-2020-nd-cp-30858/30246.htm",
+    "HD05": "https://tulieuvankien.dangcongsan.vn/upload/2006988/20260529/HD_05_VPTW_e1550.pdf"
+  },
+  "qa_scope": "structural and rule-logic only; no DOCX render or calibrated aesthetics",
+  "status": "STRUCTURAL_PASS_WITH_UNVERIFIED_AND_BLOCKED",
+  "legacy_cells_identical": true,
+  "duplicate_new_rule_codes": 0,
+  "rule_D_verified": {
+    "ND30": 207,
+    "HD05": 227
+  },
+  "source_v174_sha256": "fa9338645e98ff26274922230642bc8e0a849c5810f6a5015695ce5932c943f4",
+  "readback_with_artifact_tool": "PASS",
+  "base_sheet_cell_compare": "PASS",
+  "zip_crc_xlsx": "PASS",
+  "verification_command": "python VERIFY_PACKAGE.py BO_RULE_OFFLINE_HTHHMB_v1.7.6_FULL.zip",
+  "included_originals": [
+    "BO_RULE_PROFILE_HTHHMB_v1.7.5_TACH_SAU_PHAN_DAU.xlsx",
+    "BO_RULE_PROFILE_HTHHMB_v1.7.4_CHOT_THEO_NGUOI_DUNG.xlsx"
+  ],
+  "offline_files_count": 25
+}
